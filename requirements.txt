@@ -1,0 +1,3 @@
+streamlit # kullanıcı arayüzü
+pandas # veri işleme
+fastapi # api - kullanıcı arayüzü ve arkayüz(backend) ara katmanı

@@ -1,4 +1,4 @@
-# Energy Hackathon Starter Kit
+# CodeXEnergy Hackathon Starter Kit
 
 Bu proje, CodeXEnergy için hazırlanmış kapsamlı bir başlangıç paketidir (starter kit). Proje içerisinde veri setleri, keşifçi veri analizi (EDA) notebook'ları, bir API şablonu ve bir dashboard şablonu bulunmaktadır.
 

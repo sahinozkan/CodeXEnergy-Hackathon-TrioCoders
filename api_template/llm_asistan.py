@@ -1,19 +1,27 @@
 """
 CarbonZero AI Asistan Modulu
 ==============================
-Bu modul, Gemini LLM entegrasyonunu ve enerji uretim
-tavsiyelerini yonetir. NASA gunes verisi simulasyonu
-ile calisarak kullanicilara akilli oneriler sunar.
+Bu modul, Gemini LLM entegrasyonunu ve gercek ML tahmin
+verileriyle enerji uretim tavsiyelerini yonetir.
+model/predict.py icerisindeki predict_solar fonksiyonunu
+kullanarak kullanicilara akilli oneriler sunar.
 """
 
 import os
+import sys
 import pandas as pd
 from dotenv import load_dotenv
 from google import genai
 
+# -- Proje kok dizinini sys.path'e ekle (model/ importu icin) ---------------
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from model.predict import predict_solar
+
 # -- .env dosyasindan API anahtarini yukle ----------------------------------
-# api_template/ klasorunden bir ust dizindeki .env dosyasina ulas
-env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+env_path = os.path.join(PROJECT_ROOT, ".env")
 load_dotenv(dotenv_path=env_path)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -28,20 +36,43 @@ if not GEMINI_API_KEY:
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
-# -- ML Ekibinin verdigi tahmin fonksiyonu ----------------------------------
-def predict_solar(tarih, panel_gucu_kw=5):
-    import pandas as pd
-    saatler = [f"{str(i).zfill(2)}:00" for i in range(6, 20)]
-    uretim = [0.2, 0.8, 1.5, 2.8, 4.1, 5.0, 5.2, 4.8, 3.5, 2.1, 1.2, 0.5, 0.1, 0.0]
-    return pd.DataFrame({'saat': saatler, 'beklenen_uretim_kw': uretim})
+# ---------------------------------------------------------------------------
+#  Yardimci Fonksiyon: ML Tahmin Verisini Al
+# ---------------------------------------------------------------------------
+def get_solar_prediction(
+    tarih: str,
+    sicaklik: float = 28.0,
+    ruzgar: float = 3.0,
+    bulutluluk: float = 15.0,
+    nem: float = 45.0,
+    panel_gucu_kw: float = 5.0,
+) -> pd.DataFrame:
+    """
+    predict_solar fonksiyonunu cagirip DataFrame olarak dondurur.
+    Debug ve Streamlit goruntuleme icin kullanilir.
+
+    Returns:
+        pd.DataFrame: 'saat', 'isinim_wm2', 'beklenen_uretim_kw' kolonlari.
+    """
+    return predict_solar(
+        tarih=tarih,
+        sicaklik=sicaklik,
+        ruzgar=ruzgar,
+        bulutluluk=bulutluluk,
+        nem=nem,
+        panel_gucu_kw=panel_gucu_kw,
+    )
 
 
+# ---------------------------------------------------------------------------
+#  Ana Sinif: CarbonZero AI Asistani
+# ---------------------------------------------------------------------------
 class CarbonZeroAssistant:
     """
     CarbonZero Yapay Zeka Asistani.
 
-    Bu sinif, gunes enerjisi uretim verilerini analiz ederek
-    kullanicilara Gemini LLM destekli tavsiyeler sunar.
+    Gercek ML tahmin verileriyle gunes enerjisi uretimini analiz eder
+    ve Gemini LLM destekli tavsiyeler sunar.
     """
 
     def __init__(self):
@@ -54,20 +85,29 @@ class CarbonZeroAssistant:
         DataFrame'deki zirve saatini bulup LLM destekli tavsiye uretir.
 
         Args:
-            df (pd.DataFrame): predict_solar() formatinda DataFrame.
+            df (pd.DataFrame): predict_solar() ciktisi.
                 Kolonlar: 'saat', 'beklenen_uretim_kw'
 
         Returns:
             str: Gemini modelinden donen motive edici tavsiye metni.
         """
-        # -- DataFrame'den zirve saatini bul ---------------------------------
+        # -- Kolon kontrolu --------------------------------------------------
+        gerekli_kolonlar = ["saat", "beklenen_uretim_kw"]
+        for kolon in gerekli_kolonlar:
+            if kolon not in df.columns:
+                return f"[HATA] DataFrame'de '{kolon}' kolonu bulunamadi. Mevcut kolonlar: {list(df.columns)}"
+
+        # -- Zirve saatini bul -----------------------------------------------
         zirve_satir = df.loc[df["beklenen_uretim_kw"].idxmax()]
         saat = zirve_satir["saat"]
-        beklenen_uretim_kw = zirve_satir["beklenen_uretim_kw"]
+        beklenen_uretim_kw = round(float(zirve_satir["beklenen_uretim_kw"]), 2)
+
+        # -- Gunluk toplam uretim --------------------------------------------
+        toplam_kwh = round(float(df["beklenen_uretim_kw"].sum()), 2)
 
         # -- Engellenen karbon hesapla ---------------------------------------
         # Sebekeden cekilmeyen her 1 kWh = 0.4 kg CO2 kurtarir
-        engellenen_karbon_kg = round(beklenen_uretim_kw * 0.4, 2)
+        co2_kg = round(toplam_kwh * 0.4, 2)
 
         # -- Sistem rolu ve kullanici promptunu olustur ----------------------
         sistem_rolu = (
@@ -78,11 +118,11 @@ class CarbonZeroAssistant:
         )
 
         kullanici_promptu = (
-            f"Kullanicinin bugun saat {saat}'te {beklenen_uretim_kw} kW "
-            f"bedava gunes enerjisi olacak. Bu sayede {engellenen_karbon_kg} kg "
-            f"CO2 salinimi engellenecek. Kullaniciya camasir, bulasik makinesi "
-            f"veya elektrikli aracini bu saatte calistirmasi icin motive edici, "
-            f"cevreci bir bildirim yaz."
+            f"Kullanicinin bugun toplam {toplam_kwh} kWh gunes enerjisi uretecek. "
+            f"Zirve saati {saat}'te {beklenen_uretim_kw} kW ile en yuksek uretim olacak. "
+            f"Gunluk toplam {co2_kg} kg CO2 salinimi engellenecek. "
+            f"Kullaniciya camasir, bulasik makinesi veya elektrikli aracini "
+            f"zirve saatinde calistirmasi icin motive edici, cevreci bir bildirim yaz."
         )
 
         # -- Gemini API cagrisi (google-genai SDK) ---------------------------
@@ -93,41 +133,109 @@ class CarbonZeroAssistant:
             )
             return response.text
         except Exception as e:
-            print(f"API Hatasi (Sistemi durdurmadik): {e}") 
-            
+            print(f"API Hatasi (Sistemi durdurmadik): {e}")
+
             # -- API COKERSE CALISACAK AKILLI YEDEK SISTEM (FALLBACK) --
             if beklenen_uretim_kw >= 4.0:
-                sahte_cevap = f"Harika haber! Saat {saat}'te panellerin {beklenen_uretim_kw} kW ile tavan yapacak. {engellenen_karbon_kg} kg karbonu dogada birakmamak icin camasir makinesi veya elektrikli aracini tam bu saatte calistir! 🌍💚"
+                sahte_cevap = (
+                    f"Harika haber! Saat {saat}'te panellerin {beklenen_uretim_kw} kW "
+                    f"ile tavan yapacak. Bugun toplam {toplam_kwh} kWh uretim ve "
+                    f"{co2_kg} kg CO2 tasarrufu var. Camasir makinesi veya elektrikli "
+                    f"aracini tam bu saatte calistir!"
+                )
             elif beklenen_uretim_kw >= 2.0:
-                sahte_cevap = f"Saat {saat} itibariyle gunesten {beklenen_uretim_kw} kW verimli enerjimiz var. Bu sayede {engellenen_karbon_kg} kg CO2 engelliyoruz. Gunluk islerini halletmek icin guzel bir saat! ☀️"
+                sahte_cevap = (
+                    f"Saat {saat} itibariyle gunesten {beklenen_uretim_kw} kW verimli "
+                    f"enerjimiz var. Bugun toplam {toplam_kwh} kWh uretim ile "
+                    f"{co2_kg} kg CO2 engelliyoruz. Gunluk islerini halletmek icin "
+                    f"guzel bir saat!"
+                )
             else:
-                sahte_cevap = f"Saat {saat}'te uretim sadece {beklenen_uretim_kw} kW seviyesinde kalacak. Karbon ayak izini dusuk tutmak icin lutfen agir cihazlari calistirmayi ertele. ☁️"
-            
+                sahte_cevap = (
+                    f"Saat {saat}'te uretim sadece {beklenen_uretim_kw} kW seviyesinde. "
+                    f"Gunluk toplam {toplam_kwh} kWh ile sinirli uretim bekleniyor. "
+                    f"Karbon ayak izini dusuk tutmak icin agir cihazlari ertelemeyi dene."
+                )
+
             return sahte_cevap
-# -- Modul dogrudan calistirildiginda basit bir test yap -------------------
-if __name__ == "__main__":
-    print("=" * 50)
-    print("  CarbonZero AI Asistan - Tam Test")
-    print("=" * 50)
 
+
+# ---------------------------------------------------------------------------
+#  Streamlit / Dis Kullanim icin Tek Fonksiyon
+# ---------------------------------------------------------------------------
+def generate_advice_for_date(
+    tarih: str,
+    sicaklik: float = 28.0,
+    ruzgar: float = 3.0,
+    bulutluluk: float = 15.0,
+    nem: float = 45.0,
+    panel_gucu_kw: float = 5.0,
+) -> str:
+    """
+    Tek satirda ML tahmini + LLM tavsiyesi uretir.
+    Streamlit tarafindan dogrudan cagirilabilir.
+
+    Args:
+        tarih: "YYYY-MM-DD" formatinda tarih.
+        sicaklik: Ortalama sicaklik (C).
+        ruzgar: Ortalama ruzgar hizi (m/s).
+        bulutluluk: Bulutluluk orani (%).
+        nem: Bagil nem (%).
+        panel_gucu_kw: Kurulu panel gucu (kW).
+
+    Returns:
+        str: Kullaniciya gosterilecek tavsiye metni.
+    """
+    # 1) ML tahminini al
+    df = predict_solar(
+        tarih=tarih,
+        sicaklik=sicaklik,
+        ruzgar=ruzgar,
+        bulutluluk=bulutluluk,
+        nem=nem,
+        panel_gucu_kw=panel_gucu_kw,
+    )
+
+    # 2) LLM tavsiyesi uret
     asistan = CarbonZeroAssistant()
+    return asistan.generate_advice(df)
 
-    print("\n[OK] Gemini API baglantisi basarili!")
-    print(f"   Model: {asistan.model_name}")
+
+# ---------------------------------------------------------------------------
+#  Test Blogu
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    print("=" * 60)
+    print("  CarbonZero AI Asistan - Gercek ML Entegrasyonu Testi")
+    print("=" * 60)
+
+    test_tarihi = "2025-06-15"
 
     # 1) ML tahmin verisini al
-    df = predict_solar("bugun")
-    print(f"\n[DATA] Gunes Uretim Tahmini (predict_solar):")
+    print(f"\n[ML] predict_solar('{test_tarihi}') cagriliyor...")
+    df = get_solar_prediction(
+        tarih=test_tarihi,
+        sicaklik=28.0,
+        ruzgar=3.0,
+        bulutluluk=15.0,
+        nem=45.0,
+        panel_gucu_kw=5.0,
+    )
+    print(f"\n[DATA] Saatlik Gunes Uretim Tahmini:")
     print(df.to_string(index=False))
 
-    # 2) Zirve saatini ve karbon hesabini goster
+    # 2) Ozet istatistikler
+    toplam = round(float(df["beklenen_uretim_kw"].sum()), 2)
     zirve = df.loc[df["beklenen_uretim_kw"].idxmax()]
-    karbon = round(zirve["beklenen_uretim_kw"] * 0.4, 2)
-    print(f"\n[ZIRVE] En yuksek uretim: {zirve['saat']} -> {zirve['beklenen_uretim_kw']} kW")
+    karbon = round(toplam * 0.4, 2)
+    print(f"\n[OZET] Gunluk toplam uretim: {toplam} kWh")
+    print(f"[ZIRVE] En yuksek: {zirve['saat']} -> {round(float(zirve['beklenen_uretim_kw']), 2)} kW")
     print(f"[CO2] Engellenen karbon: {karbon} kg")
 
-    # 3) LLM'den tavsiye al ve yazdir
+    # 3) LLM tavsiyesi
     print("\n[AI] Gemini'den tavsiye isteniyor...")
-    tavsiye = asistan.generate_advice(df)
+    tavsiye = generate_advice_for_date(tarih=test_tarihi, sicaklik=28.0,
+                                        ruzgar=3.0, bulutluluk=15.0,
+                                        nem=45.0, panel_gucu_kw=5.0)
     print(f"\n[SONUC] AI Tavsiyesi:")
     print(f"   {tavsiye}")

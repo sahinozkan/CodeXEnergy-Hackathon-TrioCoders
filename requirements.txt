@@ -3,3 +3,5 @@ pandas # veri işleme
 fastapi # api - kullanıcı arayüzü ve arkayüz(backend) ara katmanı
 python-dotenv # .env dosyasından ortam değişkenlerini yükleme
 google-genai # Gemini LLM entegrasyonu (yeni SDK)
+joblib # ML model yukleme
+xgboost # ML model

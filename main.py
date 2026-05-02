@@ -33,9 +33,35 @@ demo_kullanici = {
 
 # --- 3. YAN MENÜ (Sistem Ayarları) ---
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100) # İstersen buraya hackathon logonuzu koy
-st.sidebar.title("⚙️ Sistem Ayarları")
+st.sidebar.title("⚙️ Ayarlar")
 panel_gucu = st.sidebar.slider("Kurulu Panel Gücünüz (kW)", min_value=1.0, max_value=50.0, value=5.0, step=1.0)
 sehir = st.sidebar.selectbox("Pilot Bölge", ["Ankara (Merkez)"])
+elektrik_fiyati = st.sidebar.slider("Elektrik Birim Fiyatı (₺/kWh)", 1.0, 5.0, 2.75)
+
+with st.sidebar.expander("⚙️ Sistem Ayarları", expanded=False):
+    secilen_kur = st.selectbox("Para Birimi", ["₺ (TRY)", "$ (USD)", "€ (EUR)"])
+    grafik_temasi = st.selectbox("Tema", ["Aydınlık Mod (Light)", "Karanlık Mod (Dark)"])
+
+if grafik_temasi == "Karanlık Mod (Dark)":
+    st.markdown("""
+    <style>
+    .stApp { background-color: #0E1117 !important; }
+    [data-testid="stSidebar"] { background-color: #262730 !important; }
+    [data-testid="stHeader"] { background-color: #0E1117 !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 2.5rem !important; }
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"], p, h1, h2, h3, h4, h5, h6, label, span { color: #FAFAFA !important; }
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <style>
+    .stApp { background-color: #FFFFFF !important; }
+    [data-testid="stSidebar"] { background-color: #F0F2F6 !important; }
+    [data-testid="stHeader"] { background-color: #FFFFFF !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 2.5rem !important; }
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"], p, h1, h2, h3, h4, h5, h6, label, span { color: #31333F !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 4. HAFTALIK VERİ ÇEKİMİ ---
 # Tüm 120 saatlik veriyi tek seferde alıyoruz
@@ -62,12 +88,28 @@ col1, col2, col3 = st.columns(3)
 gunluk_toplam = secilen_gun_df['beklenen_uretim_kw'].sum()
 zirve_saat = secilen_gun_df.loc[secilen_gun_df['beklenen_uretim_kw'].idxmax(), 'saat']
 zirve_uretim = secilen_gun_df['beklenen_uretim_kw'].max()
-gunluk_tasarruf = gunluk_toplam * 2.2
-co2_engelleme = gunluk_toplam * 0.4
+gunluk_tasarruf_tl = gunluk_toplam * elektrik_fiyati
+
+if secilen_kur == "$ (USD)":
+    gosterilen_tasarruf = gunluk_tasarruf_tl / 45.19
+    sembol = "$"
+elif secilen_kur == "€ (EUR)":
+    gosterilen_tasarruf = gunluk_tasarruf_tl / 53.20
+    sembol = "€"
+else:
+    gosterilen_tasarruf = gunluk_tasarruf_tl
+    sembol = "₺"
 
 col1.metric(label="Tahmini Zirve Üretimi", value=f"{zirve_uretim:.1f} kW", delta=f"{zirve_saat}'te Bekleniyor")
 col2.metric(label="Toplam Günlük Üretim", value=f"{gunluk_toplam:.1f} kWh", delta="Güneşli ve Verimli", delta_color="normal")
-col3.metric(label="Tahmini Tasarruf", value=f"₺{gunluk_tasarruf:.1f}", delta=f"{co2_engelleme:.1f} kg CO2 engellendi")
+col3.metric(label="Tahmini Tasarruf", value=f"{sembol} {gosterilen_tasarruf:.2f}", delta="Faturaya Katkısı")
+
+engellenen_karbon_kg = gunluk_toplam * 0.45
+araba_km_esdegeri = engellenen_karbon_kg * 4
+
+st.divider()
+st.subheader("🌍 Çevresel Etki (Karbon Ayak İzi)")
+st.success(f"**Bugünkü Güneş Enerjisi Üretiminizle Doğaya Katkınız:** \n* 💨 **{engellenen_karbon_kg:.1f} kg** CO₂ salınımı engellendi! \n* 🚗 Bu miktar, benzinli bir araçla **{araba_km_esdegeri:.0f} km** yol gitmemeye eşdeğerdir.")
 
 # --- 6. PLOTLY İLE SAATLİK GRAFİK ---
 st.subheader(f"📈 {secilen_tarih} Saatlik Üretim Beklentisi")
@@ -84,6 +126,12 @@ fig.update_layout(
     hovermode="x unified",
     yaxis=dict(range=[0, panel_gucu * 1.2])  
 )
+
+if grafik_temasi == "Karanlık Mod (Dark)":
+    fig.update_layout(template="plotly_dark")
+else:
+    fig.update_layout(template="plotly_white")
+
 st.plotly_chart(fig, use_container_width=True)
 
 # --- 6.4 HAFTALIK PLANLAMA ---
@@ -94,7 +142,7 @@ gunluk_uretim_plan = df_haftalik_genel.groupby('tarih')['beklenen_uretim_kw'].su
 
 toplam_5_gun = gunluk_uretim_plan['beklenen_uretim_kw'].sum()
 ortalama_gunluk = gunluk_uretim_plan['beklenen_uretim_kw'].mean()
-toplam_tasarruf_5_gun = toplam_5_gun * 2.2
+toplam_tasarruf_5_gun = toplam_5_gun * elektrik_fiyati
 
 col_plan1, col_plan2, col_plan3 = st.columns(3)
 with col_plan1:
@@ -102,7 +150,7 @@ with col_plan1:
 with col_plan2:
     st.metric(label="Günlük Ortalama", value=f"{ortalama_gunluk:.1f} kWh")
 with col_plan3:
-    st.metric(label="5 Günlük Tahmini Tasarruf", value=f"{toplam_tasarruf_5_gun:.1f} TL", help="2.2 TL/kWh üzerinden hesaplanmıştır")
+    st.metric(label="5 Günlük Tahmini Tasarruf", value=f"{sembol} {toplam_tasarruf_5_gun:.2f}", help=f"{elektrik_fiyati} TL/kWh üzerinden hesaplanmıştır")
 
 
 # --- 6.5 HAFTALIK ENERJİ İÇGÖRÜSÜ ---
@@ -120,8 +168,8 @@ gun_isimleri = {
 en_iyi_gun_ismi = pd.to_datetime(en_iyi_gun_tarih).strftime("%A")
 en_iyi_gun_ismi_tr = gun_isimleri.get(en_iyi_gun_ismi, en_iyi_gun_ismi)
 
-tasarruf_tl = en_iyi_gun_uretim * 2.2
-karbon_avantaji = en_iyi_gun_uretim * 0.4
+tasarruf_tl = en_iyi_gun_uretim * elektrik_fiyati
+karbon_avantaji = en_iyi_gun_uretim * 0.45
 
 col_w1, col_w2, col_w3 = st.columns(3)
 with col_w1:
@@ -131,7 +179,7 @@ with col_w2:
 with col_w3:
     st.warning(f"**Karbon Ayak İzi Avantajı:**\n\n### {karbon_avantaji:.1f} kg CO2 engellendi")
 
-st.markdown(f"**💡 Fırsat:** Bu gün ({en_iyi_gun_ismi_tr}) çamaşır/bulaşık yıkarsanız tahmini **{tasarruf_tl:.1f} TL** tasarruf edersiniz.")
+st.markdown(f"**💡 Fırsat:** Bu gün ({en_iyi_gun_ismi_tr}) çamaşır/bulaşık yıkarsanız tahmini **{sembol} {tasarruf_tl:.2f}** tasarruf edersiniz.")
 
 try:
     with st.spinner("🤖 Gemini Haftalık Planınızı Hazırlıyor..."):

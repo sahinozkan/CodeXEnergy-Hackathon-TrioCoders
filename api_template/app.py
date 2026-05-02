@@ -8,7 +8,7 @@ app = FastAPI(
 )
 
 # Bu dosyadan verisetinin göreceli(relative) yolunu belirt
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "datasets", "4_smart_grid", "smart_grid_dataset.csv")
+DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "datasets", "Ankara_Solar.csv")
 
 # Başlangıçta verisetini yükle
 try:

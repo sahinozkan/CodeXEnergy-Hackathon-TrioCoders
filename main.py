@@ -104,14 +104,6 @@ fig.update_layout(
 )
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 7. YAPAY ZEKA ÖNERİ MODÜLÜ (Mock) ---
-st.subheader("🤖 Gemini Akıllı Planlayıcı")
-st.info(f"""
-**💡 Günlük Eylem Planı:**  
-Analizlerime göre enerji üretiminiz bugün saat **{zirve_saat}** civarında zirveye ({zirve_uretim:.1f} kW) ulaşacak. Şebekeden elektrik çekmemek ve %100 temiz enerji kullanmak için:
-*   Çamaşır ve bulaşık makinenizi o saatlerde çalıştırın.
-*   Öğleden sonra bulutlanma beklendiği için yüksek tüketimli cihazları 15:00'ten sonraya bırakmayın.
-""")
 
 # --- 8. AKILLI BİLDİRİM SİMÜLASYONU ---
 # Set_page_config hatasına neden olan bu bloğu mantıklı bir şekilde en alta taşıdık

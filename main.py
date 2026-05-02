@@ -4,8 +4,19 @@ import plotly.express as px
 import time
 import io
 import re
-import requests
-from gtts import gTTS
+
+try:
+    from gtts import gTTS
+    HAS_GTTS = True
+except ImportError:
+    HAS_GTTS = False
+
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
+
 from model.predict import predict_solar_weekly
 from api_template.llm_asistan import generate_weekly_advice_for_app, generate_advice_for_dataframe
 
@@ -213,31 +224,37 @@ try:
     temiz_metin = re.sub(r'[^\w\s.,;:!?()\-üÜğĞıİşŞçÇöÖ]', '', temiz_metin)
 
     # 4. Temizlenmiş ve emojilerden arındırılmış metni gTTS'e gönder
-    try:
-        tts = gTTS(text=temiz_metin, lang='tr')
-        sound_file = io.BytesIO()
-        tts.write_to_fp(sound_file)
-        st.audio(sound_file)
-    except Exception as tts_err:
-        st.warning("Sesli asistan (Google TTS) sunuculara bağlanamadığı için şu an okuma yapılamıyor.")
+    if HAS_GTTS:
+        try:
+            tts = gTTS(text=temiz_metin, lang='tr')
+            sound_file = io.BytesIO()
+            tts.write_to_fp(sound_file)
+            st.audio(sound_file)
+        except Exception as tts_err:
+            st.warning("Sesli asistan (Google TTS) sunuculara bağlanamadığı için şu an okuma yapılamıyor.")
+    else:
+        st.warning("Sesli okuma için 'gTTS' kütüphanesi eksik. Terminale yazın: pip install gTTS")
     
     st.divider()
     st.write("📱 Akıllı Cihaz Entegrasyonu")
     if st.button("📲 Eylem Planını Telefonuma Gönder", use_container_width=True):
-        try:
-            # ntfy.sh servisine POST isteği atıyoruz
-            requests.post(
-                "https://ntfy.sh/Trio_Coders",
-                data=temiz_metin.encode('utf-8'),
-                headers={
-                    "Title": "CodeXEnergy Asistani",
-                    "Priority": "high",
-                    "Tags": "robot,zap"
-                }
-            )
-            st.toast("Bildirim başarıyla telefonunuza iletildi!", icon="✅")
-        except Exception as e:
-            st.error(f"Bildirim gönderilemedi. Hata detayı: {e}")
+        if HAS_REQUESTS:
+            try:
+                # ntfy.sh servisine POST isteği atıyoruz
+                requests.post(
+                    "https://ntfy.sh/Trio_Coders",
+                    data=temiz_metin.encode('utf-8'),
+                    headers={
+                        "Title": "CodeXEnergy Asistani",
+                        "Priority": "high",
+                        "Tags": "robot,zap"
+                    }
+                )
+                st.toast("Bildirim başarıyla telefonunuza iletildi!", icon="✅")
+            except Exception as e:
+                st.error(f"Bildirim gönderilemedi. Hata detayı: {e}")
+        else:
+            st.error("'requests' kütüphanesi eksik! Lütfen terminale yazın: pip install requests")
 
 except Exception as e:
     st.error(f"Gemini bağlantı hatası: {e}")

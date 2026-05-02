@@ -10,8 +10,10 @@ kullanarak kullanicilara akilli oneriler sunar.
 import os
 import sys
 import pandas as pd
-from dotenv import load_dotenv
-from google import genai
+
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
 
 # -- Proje kok dizinini sys.path'e ekle (model/ importu icin) ---------------
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -19,21 +21,6 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from model.predict import predict_solar
-
-# -- .env dosyasindan API anahtarini yukle ----------------------------------
-env_path = os.path.join(PROJECT_ROOT, ".env")
-load_dotenv(dotenv_path=env_path)
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError(
-        "GEMINI_API_KEY bulunamadi! "
-        "Lutfen ana dizindeki .env dosyasina GEMINI_API_KEY degerini ekleyin."
-    )
-
-# -- Gemini API istemcisini olustur -----------------------------------------
-client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 # ---------------------------------------------------------------------------
@@ -76,11 +63,10 @@ class CarbonZeroAssistant:
     """
 
     def __init__(self):
-        """Asistani baslat ve Gemini istemcisini yapilandir."""
-        self.client = client
-        self.model_name = "gemini-2.0-flash"
+        """Asistani baslat."""
+        pass
 
-    def generate_advice(self, df: pd.DataFrame, secilen_tarih: str = "Bugün") -> str:
+    def generate_advice(self, df: pd.DataFrame, secilen_tarih: str = "Bugün", bulutluluk: float = 15.0) -> str:
         """
         DataFrame'deki zirve saatini bulup LLM destekli tavsiye uretir.
 
@@ -88,6 +74,7 @@ class CarbonZeroAssistant:
             df (pd.DataFrame): predict_solar() ciktisi.
                 Kolonlar: 'saat', 'beklenen_uretim_kw'
             secilen_tarih (str): Kullanıcının incelediği tarih.
+            bulutluluk (float): O gunun bulutluluk orani. Yedek sistem icin.
 
         Returns:
             str: Gemini modelinden donen motive edici tavsiye metni.
@@ -137,29 +124,51 @@ class CarbonZeroAssistant:
         except Exception as e:
             print(f"API Hatasi (Sistemi durdurmadik): {e}")
 
-            # -- API COKERSE CALISACAK AKILLI YEDEK SISTEM (FALLBACK) --
-            if beklenen_uretim_kw >= 4.0:
-                sahte_cevap = (
-                    f"Harika haber! Saat {saat}'te panellerin {beklenen_uretim_kw} kW "
-                    f"ile tavan yapacak. Bugun toplam {toplam_kwh} kWh uretim ve "
-                    f"{co2_kg} kg CO2 tasarrufu var. Camasir makinesi veya elektrikli "
-                    f"aracini tam bu saatte calistir!"
-                )
-            elif beklenen_uretim_kw >= 2.0:
-                sahte_cevap = (
-                    f"Saat {saat} itibariyle gunesten {beklenen_uretim_kw} kW verimli "
-                    f"enerjimiz var. Bugun toplam {toplam_kwh} kWh uretim ile "
-                    f"{co2_kg} kg CO2 engelliyoruz. Gunluk islerini halletmek icin "
-                    f"guzel bir saat!"
-                )
-            else:
-                sahte_cevap = (
-                    f"Saat {saat}'te uretim sadece {beklenen_uretim_kw} kW seviyesinde. "
-                    f"Gunluk toplam {toplam_kwh} kWh ile sinirli uretim bekleniyor. "
-                    f"Karbon ayak izini dusuk tutmak icin agir cihazlari ertelemeyi dene."
-                )
+        # -- AKILLI YEDEK SISTEM (FALLBACK) --
+        if bulutluluk > 50.0:
+            # Hava cok kapaliyken
+            sahte_cevap = (
+                f"☁️ **Bugun hava kapali, tasarruf moduna gecin!**\n\n"
+                f"Panellerin maksimum **{beklenen_uretim_kw} kW** uretim ile "
+                f"saat **{saat}**'te zirve yapacak. Ancak bulutlu hava sebebiyle "
+                f"gunluk toplam uretim **{toplam_kwh} kWh**'da kalacak.\n\n"
+                f"**Simdi yapabileceklerin:**\n"
+                f"- ⏳ Agir cihazlari (camasir, kurutma) {secilen_tarih} yerine daha gunesli bir gune ertele\n"
+                f"- 💡 Sadece gerekli elektrikli aletleri kullan"
+            )
+        elif beklenen_uretim_kw >= 4.0:
+            # Hava cok iyi, uretim tavan
+            sahte_cevap = (
+                f"☀️ **Harika bir gunes var, tum agir cihazlari calistirabilirsiniz!**\n\n"
+                f"{secilen_tarih} tarihinde Saat **{saat}**'te uretim tam **{beklenen_uretim_kw} kW** ile tavan yapacak!\n"
+                f"Bugun sebekeden cekmeyerek **{co2_kg} kg CO2** tasarrufu sagliyoruz. 🌍💚\n\n"
+                f"**Simdi yapabileceklerin:**\n"
+                f"- 🧺 Camasir ve bulasik makinesini ayni anda calistir\n"
+                f"- 🚗 Elektrikli aracini hizli sarja tak"
+            )
+        elif beklenen_uretim_kw >= 2.0:
+            # Orta seviye uretim
+            sahte_cevap = (
+                f"⚡ **Ortalama ve verimli bir gunes gunu!**\n\n"
+                f"{secilen_tarih} tarihi Saat **{saat}** civarinda paneller **{beklenen_uretim_kw} kW** gucunde uretim saglayacak.\n"
+                f"Gunluk **{toplam_kwh} kWh** enerjin var, **{co2_kg} kg CO2** engelleniyor. 📊\n\n"
+                f"**Oneriler:**\n"
+                f"- 🧺 Tek bir agir makineyi (ornegin camasir makinesi) calistir\n"
+                f"- 🏠 Orta tuketimli cihazlarini (supurge vs.) bu saatlerde kullan"
+            )
+        else:
+            # Genel dusuk uretim
+            sahte_cevap = (
+                f"📉 **Bugun gucumuz biraz sinirli.**\n\n"
+                f"{secilen_tarih} tarihi en iyi saatinde (**{saat}**) bile uretim "
+                f"**{beklenen_uretim_kw} kW** seviyesinde kalacak.\n\n"
+                f"**Oneriler:**\n"
+                f"- 🔋 Varsa ev bataryalarini idareli kullan\n"
+                f"- 💡 Zorunlu islerini saat {saat}'e planla, digerlerini yarına ertele"
+            )
+            )
 
-            return sahte_cevap
+        return sahte_cevap
 
     def generate_weekly_advice(self, en_iyi_gun_ismi: str, en_iyi_gun_uretim: float) -> str:
         """
@@ -231,7 +240,7 @@ def generate_advice_for_date(
 
     # 2) LLM tavsiyesi uret
     asistan = CarbonZeroAssistant()
-    return asistan.generate_advice(df)
+    return asistan.generate_advice(df, bulutluluk=bulutluluk)
 
 def generate_weekly_advice_for_app(en_iyi_gun_ismi: str, en_iyi_gun_uretim: float) -> str:
     """

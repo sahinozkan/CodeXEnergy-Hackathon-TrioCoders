@@ -68,7 +68,6 @@ else:
 df_haftalik_genel = predict_solar_weekly(panel_gucu_kw=panel_gucu)
 benzersiz_tarihler = df_haftalik_genel['tarih'].unique().tolist()
 
-
 # --- 5. ANA EKRAN VE METRİKLER ---
 st.title("☀️ Akıllı Çatı Güneş Asistanı")
 st.markdown("Günlük enerji üretiminizi takip edin ve tüketiminizi yapay zeka ile optimize edin.")

@@ -11,7 +11,11 @@ import os
 import sys
 import pandas as pd
 from dotenv import load_dotenv
+load_dotenv()
 from google import genai
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
 
 # -- Proje kok dizinini sys.path'e ekle (model/ importu icin) ---------------
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -151,10 +155,11 @@ class CarbonZeroAssistant:
             return response.text
             
         except Exception as e:
-            print(f"\n[TEST] ---> HATA! GEMİNİ API ÇÖKTÜ: {e}")
-            print("[TEST] ---> FALLBACK (YEDEK METİN) DEVREYE GİRDİ ---")
+            print(f"\n[TEST] ---> HATA! GEMINI API COKTU: {e}")
+            print("[TEST] ---> FALLBACK (YEDEK METIN) DEVREYE GIRDI ---")
             
             # Eğer API çökerse ekrana basılacak olan senin eski sabit metnin:
+            print(f'[ALERT] API GERCEK HATASI: {e}')
             return '💡 **Günlük Eylem Planı:** Analizlerime göre bugün güneş enerjisi üretiminiz oldukça verimli görünüyor. Şebekeden elektrik çekmemek ve tasarruf etmek için yüksek tüketimli cihazlarınızı (çamaşır, bulaşık makinesi) öğle saatlerinde çalıştırabilirsiniz.'
 
             # -- API COKERSE CALISACAK AKILLI YEDEK SISTEM (FALLBACK) --

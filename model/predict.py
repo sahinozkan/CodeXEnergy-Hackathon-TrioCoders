@@ -92,7 +92,7 @@ def predict_solar(tarih: str, sicaklik: float = 15.0, ruzgar: float = 2.5,
 
 def get_5_day_forecast():
     """Open-Meteo API'sinden Ankara'nın 5 günlük saatlik sıcaklık, rüzgar ve bulutluluk verisini çeker."""
-    url = "https://api.open-meteo.com/v1/forecast?latitude=39.9208&longitude=32.8541&hourly=temperature_2m,windspeed_10m,cloudcover&forecast_days=5"
+    url = "https://api.open-meteo.com/v1/forecast?latitude=39.9208&longitude=32.8541&hourly=temperature_2m,windspeed_10m,cloudcover&forecast_days=5&timezone=Europe%2FIstanbul"
     try:
         response = requests.get(url, timeout=5)
         response.raise_for_status()

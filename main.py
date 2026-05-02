@@ -47,7 +47,11 @@ demo_kullanici = {
 }
 
 # --- 3. YAN MENÜ (Sistem Ayarları) ---
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100) # İstersen buraya hackathon logonuzu koy
+import os
+if os.path.exists("triocoders_logo.png") and os.path.getsize("triocoders_logo.png") > 0:
+    st.sidebar.image("triocoders_logo.png", use_container_width=True)
+else:
+    st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100) # Fallback
 st.sidebar.title("⚙️ Ayarlar")
 panel_gucu = st.sidebar.slider("Kurulu Panel Gücünüz (kW)", min_value=1.0, max_value=50.0, value=5.0, step=1.0)
 sehir = st.sidebar.selectbox("Pilot Bölge", ["Ankara (Merkez)"])
@@ -96,6 +100,7 @@ with col_sel:
 secilen_gun_df = df_haftalik_genel[df_haftalik_genel['tarih'] == secilen_tarih].reset_index(drop=True)
 
 st.subheader(f"📊 {secilen_tarih} Tarihi İçin Üretim Özeti")
+tracker_aktif = st.toggle("🔄 Akıllı Güneş Takip (Solar Tracker) Simülasyonunu Aç")
 col1, col2, col3 = st.columns(3)
 
 # Seçilen günün metrikleri
@@ -118,12 +123,56 @@ col1.metric(label="Tahmini Zirve Üretimi", value=f"{zirve_uretim:.1f} kW", delt
 col2.metric(label="Toplam Günlük Üretim", value=f"{gunluk_toplam:.1f} kWh", delta="Güneşli ve Verimli", delta_color="normal")
 col3.metric(label="Tahmini Tasarruf", value=f"{sembol} {gosterilen_tasarruf:.2f}", delta="Faturaya Katkısı")
 
+if tracker_aktif:
+    sabit_uretim = gunluk_toplam
+    hareketli_uretim = sabit_uretim * 1.30
+    ekstra_kwh = hareketli_uretim - sabit_uretim
+    ekstra_co2 = ekstra_kwh * 0.45
+    ekstra_gelir_tl = ekstra_kwh * elektrik_fiyati
+    
+    if secilen_kur == "$ (USD)":
+        ekstra_gelir = ekstra_gelir_tl / 45.19
+    elif secilen_kur == "€ (EUR)":
+        ekstra_gelir = ekstra_gelir_tl / 53.20
+    else:
+        ekstra_gelir = ekstra_gelir_tl
+        
+    st.markdown("##### 🔄 Hareketli Panel (Solar Tracker) Farkı")
+    tcol1, tcol2, tcol3 = st.columns(3)
+    tcol1.metric("⚡ Ekstra Üretim", f"+ {ekstra_kwh:.1f} kWh")
+    tcol2.metric("🌍 Ekstra Karbon Kurtarımı", f"+ {ekstra_co2:.1f} kg")
+    tcol3.metric("💰 Günlük Ekstra Kazanç", f"+ {sembol} {ekstra_gelir:.2f}")
+
 engellenen_karbon_kg = gunluk_toplam * 0.45
-araba_km_esdegeri = engellenen_karbon_kg * 4
+kurtarilan_agac = int(engellenen_karbon_kg / 0.06)
 
 st.divider()
 st.subheader("🌍 Çevresel Etki (Karbon Ayak İzi)")
-st.success(f"**Bugünkü Güneş Enerjisi Üretiminizle Doğaya Katkınız:** \n* 💨 **{engellenen_karbon_kg:.1f} kg** CO₂ salınımı engellendi! \n* 🚗 Bu miktar, benzinli bir araçla **{araba_km_esdegeri:.0f} km** yol gitmemeye eşdeğerdir.")
+st.success(f"**Bugünkü Güneş Enerjisi Üretiminizle Doğaya Katkınız:** \n* 💨 **{engellenen_karbon_kg:.1f} kg** CO₂ salınımı engellendi! \n* 🌳 Bu miktar, tam {kurtarilan_agac} yetişkin ağacın bir tam günde temizleyebileceği havaya eşdeğerdir!")
+
+st.write("") # Boşluk bırak
+with st.expander("⚡ Şebekeye Satış (Mahsuplaşma) Simülatörü", expanded=True):
+    st.markdown("Türkiye 'Lisanssız Elektrik Üretimi' yönetmeliğine göre ihtiyaç fazlası enerjinizi şebekeye satabilirsiniz. (EPDK verilerine göre Türkiye'de günlük ortalama ev tüketimi **8.0 kWh**'dir.)")
+    
+    # Kullanıcıdan tahmini günlük tüketimini al
+    gunluk_tuketim = st.slider("Bugünkü Tahmini Ev Tüketiminiz (kWh)", min_value=0.0, max_value=50.0, value=8.0, step=0.5)
+    
+    # Hesaplama:
+    net_enerji = gunluk_toplam - gunluk_tuketim 
+    
+    if net_enerji > 0:
+        satis_geliri = net_enerji * elektrik_fiyati 
+        
+        if 'secilen_kur' in locals() and secilen_kur == "$ (USD)":
+            gosterilen_gelir = f"$ {(satis_geliri / 45.19):.2f}"
+        elif 'secilen_kur' in locals() and secilen_kur == "€ (EUR)":
+            gosterilen_gelir = f"€ {(satis_geliri / 53.20):.2f}"
+        else:
+            gosterilen_gelir = f"₺ {satis_geliri:.2f}"
+            
+        st.success(f"**Tebrikler!** Tüketiminizden arta kalan **{net_enerji:.1f} kWh** enerjiyi şebekeye sattınız. **Net Kazanç: {gosterilen_gelir}**")
+    else:
+        st.warning(f"Bugün üretiminiz tüketiminizi karşılamıyor. Şebekeden **{abs(net_enerji):.1f} kWh** enerji çekeceksiniz.")
 
 # --- 6. PLOTLY İLE SAATLİK GRAFİK ---
 st.subheader(f"📈 {secilen_tarih} Saatlik Üretim Beklentisi")
@@ -145,6 +194,19 @@ if grafik_temasi == "Karanlık Mod (Dark)":
     fig.update_layout(template="plotly_dark")
 else:
     fig.update_layout(template="plotly_white")
+
+if tracker_aktif:
+    import plotly.graph_objects as go
+    fig.add_trace(
+        go.Scatter(
+            x=secilen_gun_df['saat'], 
+            y=secilen_gun_df['beklenen_uretim_kw'] * 1.30, 
+            mode='lines+markers',
+            name='Hareketli Panel (+%30)',
+            line=dict(color='#00b894', width=3, dash='dash'),
+            marker=dict(size=6)
+        )
+    )
 
 st.plotly_chart(fig, use_container_width=True)
 
@@ -211,6 +273,12 @@ try:
     with st.spinner(f"🤖 Gemini {secilen_tarih} günü için tavsiyesini hazırlıyor..."):
         gunluk_tavsiye = generate_advice_for_dataframe(secilen_gun_df, secilen_tarih)
     
+    # Ekranda (st.info) görünmesi için ek analitik kuralı doğrudan ana metne dahil ediyoruz
+    gunluk_tavsiye += f"\n\n📌 **Öneri:** Haftanın en verimli günü **{en_iyi_gun_ismi_tr}**. Eğer aciliyetin yoksa yüksek enerji gerektiren planlarını o güne bırakabilirsin."
+
+    if tracker_aktif:
+        gunluk_tavsiye += f"\n\n💡 Yatırım Tavsiyesi: Eğer çatıdaki sisteminizi 'Hareketli Panel (Solar Tracker)' sistemine geçirirseniz, sadece bugün ekstra {ekstra_kwh:.1f} kWh enerji ve {sembol} {ekstra_gelir:.2f} kazanç elde ederdiniz. Bu sistem kendini kısa sürede amorti edebilir!"
+
     st.info(f"**💡 {secilen_tarih} İçin Günlük Eylem Planı:**\n\n{gunluk_tavsiye}")
     
     st.write("🔊 Asistanı Sesli Dinle")
@@ -222,6 +290,24 @@ try:
 
     # 3. Emojileri ve özel sembolleri Regex ile temizle (Sadece harfler, sayılar, Türkçe karakterler ve temel noktalama işaretleri kalsın)
     temiz_metin = re.sub(r'[^\w\s.,;:!?()\-üÜğĞıİşŞçÇöÖ]', '', temiz_metin)
+
+
+    if "ilk_bildirim_gonderildi" not in st.session_state:
+        try:
+            import requests
+            requests.post(
+                "https://ntfy.sh/Trio_Coders",
+                data=temiz_metin.encode('utf-8'),
+                headers={
+                    "Title": "CodeXEnergy Asistani", 
+                    "Priority": "high", 
+                    "Tags": "robot,zap",
+                    "Actions": "view, Panele Don ve Uygula, http://localhost:8501" 
+                }
+            )
+            st.session_state.ilk_bildirim_gonderildi = True
+        except Exception as e:
+            pass # Otomatik akışta arayüze hata basıp UX'i bozma
 
     # 4. Temizlenmiş ve emojilerden arındırılmış metni gTTS'e gönder
     if HAS_GTTS:
@@ -235,40 +321,33 @@ try:
     else:
         st.warning("Sesli okuma için 'gTTS' kütüphanesi eksik. Terminale yazın: pip install gTTS")
     
-    st.divider()
-    st.write("📱 Akıllı Cihaz Entegrasyonu")
-    if st.button("📲 Eylem Planını Telefonuma Gönder", use_container_width=True):
-        if HAS_REQUESTS:
-            try:
-                # ntfy.sh servisine POST isteği atıyoruz
-                requests.post(
-                    "https://ntfy.sh/Trio_Coders",
-                    data=temiz_metin.encode('utf-8'),
-                    headers={
-                        "Title": "CodeXEnergy Asistani",
-                        "Priority": "high",
-                        "Tags": "robot,zap"
-                    }
-                )
-                st.toast("Bildirim başarıyla telefonunuza iletildi!", icon="✅")
-            except Exception as e:
-                st.error(f"Bildirim gönderilemedi. Hata detayı: {e}")
-        else:
-            st.error("'requests' kütüphanesi eksik! Lütfen terminale yazın: pip install requests")
+
 
 except Exception as e:
     st.error(f"Gemini bağlantı hatası: {e}")
 
 
-# --- 8. AKILLI BİLDİRİM SİMÜLASYONU ---
+# --- 8. YARDIM MASASI (Kural Tabanlı Asistan) ---
 st.divider()
-st.subheader("📲 Akıllı Bildirim Sistemi")
-st.write(f"Ev Sahibi: **{demo_kullanici['ad_soyad']}** ({demo_kullanici['lokasyon']})")
+st.subheader("💬 CodeXEnergy Yardım Masası")
 
-if st.button("📱 Yapay Zeka Önerisini Telefona Gönder"):
-    with st.spinner("Şebeke üzerinden güvenli SMS iletiliyor..."):
-        time.sleep(1.5) 
-        
-    st.toast("SMS Başarıyla İletildi!", icon="🚀")
-    mesaj = f"CodeXEnergy Asistanı: Sayın {demo_kullanici['ad_soyad']}, {secilen_tarih} tarihinde güneş paneli üretiminiz {zirve_saat}'te {zirve_uretim:.1f}kW ile zirve yapacak. Beyaz eşyalarınızı bu saatlerde çalıştırmanızı öneririm."
-    st.success(f"**Bildirim Gönderildi:** Aşağıdaki mesaj {demo_kullanici['telefon']} numaralı telefona başarıyla ulaştı.\n\n> *{mesaj}*")
+sss_sozlugu = {
+    "Lütfen sormak istediğiniz soruyu seçin...": "",
+    "💰 Sistem kendini ne kadar sürede amorti eder?": "Mevcut elektrik fiyatları ve güneşlenme süreleri göz önüne alındığında, ortalama 5 kW'lık bir sistem kendini 4-5 yıl içinde amorti eder. Yukarıdaki 'Tahmini Tasarruf' metriklerinden günlük kazancınızı takip edebilirsiniz.",
+    "🌍 Karbon tasarrufu hesaplaması nasıl çalışıyor?": "Türkiye ortalamasına göre şebekeden çekilmeyen her 1 kWh elektrik, yaklaşık 0.45 kg CO2 salınımını engeller. Sistemimiz, anlık üretiminizle bu katsayıyı çarparak doğaya katkınızı şeffafça hesaplar.",
+    "⏱️ Yüksek enerji tüketen cihazları ne zaman çalıştırmalıyım?": "Grafikteki 'Tahmini Zirve Üretimi' saatlerinde (genellikle 11:00 - 14:00 arası) yüksek tüketimli cihazları çalıştırmak, şebekeye olan maliyetinizi sıfıra indirir.",
+    "🛠️ Panellerin veriminin düştüğünü nasıl anlarım?": "Yapay zeka asistanımız, meteoroloji verileri ile üretim verilerinizi anlık karşılaştırır. Eğer optimum şartlarda üretim düşük kalırsa, eylem planı üzerinden size 'Temizlik veya Bakım' uyarısı verir.",
+    "☁️ Hava bulutlu veya yağmurlu olduğunda sistem çalışır mı?": "Evet, panellerimiz dağınık ışıkta bile enerji üretmeye devam eder. Ancak güneşli günlere kıyasla verim %10 ila %25 arasına düşebilir. Akıllı planlayıcımız bu dalgalanmaları önceden tahmin ederek planınızı günceller.",
+    "🔋 Evimde batarya (depolama) sistemi kullanmalı mıyım?": "Ürettiğiniz enerjinin fazlasını gece kullanmak veya elektrik kesintilerinden etkilenmemek istiyorsanız batarya sistemleri harika bir yatırımdır. Sistemimiz, mevcut üretim profilinize göre batarya ihtiyacınızı analiz edebilir.",
+    "📈 'Tahmini Zirve Üretimi' ne anlama geliyor?": "Gün içinde güneş ışınlarının panellerinize en dik açıyla geldiği ve sistemin maksimum verimle çalıştığı (en yüksek kW değerine ulaştığı) tepe noktasını ifade eder.",
+    "📱 Akıllı asistan bildirimleri ücretli mi?": "Hayır, CodeXEnergy asistan bildirimleri tamamen ücretsizdir. ntfy altyapısı üzerinden telefonunuza güvenli ve anlık bir şekilde iletilir.",
+    "🔌 Sisteme yeni akıllı ev aletleri (IoT) bağlayabilir miyim?": "Kesinlikle! Faz-2 aşamasında akıllı prizler ve Wi-Fi destekli röleler entegre edilecek. Böylece üretim zirvedeyken çamaşır makineniz sistem tarafından otomatik başlatılabilecek.",
+    "📊 Verilerim ne kadar güvende tutuluyor?": "Tüm enerji üretim ve tüketim verileriniz yerel olarak işlenir veya şifrelenmiş sunucularımızda anonim olarak analiz edilir. Verileriniz asla üçüncü partilerle paylaşılmaz.",
+    "⚡ İhtiyaç fazlası elektriğimi devlete satabilir miyim? (Mahsuplaşma)": "Evet! Türkiye'deki 'Aylık Mahsuplaşma' yönetmeliği sayesinde, çift yönlü sayaç taktırarak tüketiminizden arta kalan elektriği kendi satın aldığınız aktif enerji bedeli üzerinden dağıtım şirketine satıp nakit gelir elde edebilirsiniz."
+}
+
+secilen_soru = st.selectbox("Yardımcı Asistana Sorun:", list(sss_sozlugu.keys()), label_visibility="collapsed")
+
+if secilen_soru != "Lütfen sormak istediğiniz soruyu seçin...":
+    with st.chat_message("assistant"):
+        st.write(sss_sozlugu[secilen_soru])

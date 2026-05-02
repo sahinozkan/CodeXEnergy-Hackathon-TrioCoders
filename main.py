@@ -36,6 +36,7 @@ st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", widt
 st.sidebar.title("⚙️ Sistem Ayarları")
 panel_gucu = st.sidebar.slider("Kurulu Panel Gücünüz (kW)", min_value=1.0, max_value=50.0, value=5.0, step=1.0)
 sehir = st.sidebar.selectbox("Pilot Bölge", ["Ankara (Merkez)"])
+elektrik_fiyati = st.sidebar.slider("Elektrik Birim Fiyatı (₺/kWh)", 1.0, 5.0, 2.75)
 
 # 1. Önce Kişi 1'in modeliyle veriyi al (Zaten yapmıştın)
 # df_gercek = predict_solar(tarih=secilen_tarih, panel_gucu_kw=panel_gucu)
@@ -77,13 +78,14 @@ st.subheader("📊 Günlük Üretim Özeti")
 col1, col2, col3 = st.columns(3)
 
 # Modelden gelen verilere göre dinamik metrikler hesaplayalım
-gunluk_toplam = df_gercek['beklenen_uretim_kw'].sum()
+toplam_uretim = df_gercek['beklenen_uretim_kw'].sum()
 zirve_saat = df_gercek.loc[df_gercek['beklenen_uretim_kw'].idxmax(), 'saat']
 zirve_uretim = df_gercek['beklenen_uretim_kw'].max()
+gunluk_tasarruf = toplam_uretim * elektrik_fiyati
 
 col1.metric(label="Tahmini Zirve Üretimi", value=f"{zirve_uretim:.1f} kW", delta=f"{zirve_saat}'te Bekleniyor")
-col2.metric(label="Toplam Günlük Üretim", value=f"{gunluk_toplam:.1f} kWh", delta="Güneşli ve Verimli", delta_color="normal")
-col3.metric(label="Tahmini Tasarruf", value="₺75", delta="+₺15 düne göre")
+col2.metric(label="Toplam Günlük Üretim", value=f"{toplam_uretim:.1f} kWh", delta="Güneşli ve Verimli", delta_color="normal")
+col3.metric(label="Tahmini Tasarruf", value=f"₺{gunluk_tasarruf:.0f}", delta="Faturaya Katkısı")
 
 # --- 6. PLOTLY İLE SAATLİK GRAFİK ---
 st.subheader("📈 Saatlik Üretim Beklentisi")

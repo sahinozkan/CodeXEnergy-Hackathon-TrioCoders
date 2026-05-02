@@ -166,7 +166,6 @@ class CarbonZeroAssistant:
                 f"- 🔋 Varsa ev bataryalarini idareli kullan\n"
                 f"- 💡 Zorunlu islerini saat {saat}'e planla, digerlerini yarına ertele"
             )
-            )
 
         return sahte_cevap
 

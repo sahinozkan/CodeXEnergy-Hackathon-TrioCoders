@@ -80,13 +80,14 @@ class CarbonZeroAssistant:
         self.client = client
         self.model_name = "gemini-2.0-flash"
 
-    def generate_advice(self, df: pd.DataFrame) -> str:
+    def generate_advice(self, df: pd.DataFrame, secilen_tarih: str = "Bugün") -> str:
         """
         DataFrame'deki zirve saatini bulup LLM destekli tavsiye uretir.
 
         Args:
             df (pd.DataFrame): predict_solar() ciktisi.
                 Kolonlar: 'saat', 'beklenen_uretim_kw'
+            secilen_tarih (str): Kullanıcının incelediği tarih.
 
         Returns:
             str: Gemini modelinden donen motive edici tavsiye metni.
@@ -118,11 +119,12 @@ class CarbonZeroAssistant:
         )
 
         kullanici_promptu = (
-            f"Kullanicinin bugun toplam {toplam_kwh} kWh gunes enerjisi uretecek. "
+            f"Kullanici {secilen_tarih} tarihinde toplam {toplam_kwh} kWh gunes enerjisi uretecek. "
             f"Zirve saati {saat}'te {beklenen_uretim_kw} kW ile en yuksek uretim olacak. "
             f"Gunluk toplam {co2_kg} kg CO2 salinimi engellenecek. "
             f"Kullaniciya camasir, bulasik makinesi veya elektrikli aracini "
-            f"zirve saatinde calistirmasi icin motive edici, cevreci bir bildirim yaz."
+            f"o gun {saat} civari calistirmasi icin motive edici, cevreci bir bildirim yaz. "
+            f"Mesajda bu spesifik tarihi ({secilen_tarih}) de kullaniciya hissettir."
         )
 
         # -- Gemini API cagrisi (google-genai SDK) ---------------------------
@@ -158,6 +160,37 @@ class CarbonZeroAssistant:
                 )
 
             return sahte_cevap
+
+    def generate_weekly_advice(self, en_iyi_gun_ismi: str, en_iyi_gun_uretim: float) -> str:
+        """
+        Haftalık analiz için Gemini'den tavsiye üretir.
+        """
+        sistem_rolu = (
+            "Sen CarbonZero AI adinda cevreci ve akilli bir ev enerjisi "
+            "asistanisin. Yanitlarin cok kisa (maksimum 2-3 cumle), "
+            "motive edici, samimi ve dogrudan eyleme yonelik olmali."
+        )
+
+        kullanici_promptu = (
+            f"Sistemimiz önümüzdeki 5 günü analiz etti. En yüksek üretim {en_iyi_gun_ismi} günü "
+            f"{en_iyi_gun_uretim:.1f} kWh ile gerçekleşecek. Lütfen kullanıcıya bu özel günü "
+            f"vurgulayan, ağır beyaz eşyalarını o güne saklamasını öneren, hem doğayı hem "
+            f"cebini koruduğunu hissettiren samimi bir tavsiye mesajı oluştur."
+        )
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=f"{sistem_rolu}\n\n{kullanici_promptu}",
+            )
+            return response.text
+        except Exception as e:
+            print(f"API Hatasi (Sistemi durdurmadik): {e}")
+            return (
+                f"Sistemimiz önümüzdeki 5 günü analiz etti. En yüksek üretim {en_iyi_gun_ismi} günü "
+                f"{en_iyi_gun_uretim:.1f} kWh ile gerçekleşecek. Doğayı ve cebinizi korumak için "
+                f"ağır beyaz eşyalarınızı o güne planlayabilirsiniz!"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +233,20 @@ def generate_advice_for_date(
     asistan = CarbonZeroAssistant()
     return asistan.generate_advice(df)
 
+def generate_weekly_advice_for_app(en_iyi_gun_ismi: str, en_iyi_gun_uretim: float) -> str:
+    """
+    Haftalık analiz için LLM tavsiyesi üretir.
+    Streamlit tarafindan dogrudan cagirilabilir.
+    """
+    asistan = CarbonZeroAssistant()
+    return asistan.generate_weekly_advice(en_iyi_gun_ismi, en_iyi_gun_uretim)
+
+def generate_advice_for_dataframe(df: pd.DataFrame, tarih: str) -> str:
+    """
+    Hazır DataFrame'i ve tarihi kullanarak Gemini'den tavsiye alır.
+    """
+    asistan = CarbonZeroAssistant()
+    return asistan.generate_advice(df, secilen_tarih=tarih)
 
 # ---------------------------------------------------------------------------
 #  Test Blogu

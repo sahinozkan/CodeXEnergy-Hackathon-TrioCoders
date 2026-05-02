@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import time
-from model.predict import predict_solar
-from api_template.llm_asistan import generate_advice_for_date
+from model.predict import predict_solar_weekly
+from api_template.llm_asistan import generate_weekly_advice_for_app, generate_advice_for_dataframe
 
 # --- 1. SAYFA YAPILANDIRMASI (Jüri için profesyonel görünüm) ---
 # st.set_page_config sayfanın ilk Streamlit komutu olmak zorundadır!
@@ -37,96 +37,132 @@ st.sidebar.title("⚙️ Sistem Ayarları")
 panel_gucu = st.sidebar.slider("Kurulu Panel Gücünüz (kW)", min_value=1.0, max_value=50.0, value=5.0, step=1.0)
 sehir = st.sidebar.selectbox("Pilot Bölge", ["Ankara (Merkez)"])
 
-# 1. Önce Kişi 1'in modeliyle veriyi al (Zaten yapmıştın)
-# df_gercek = predict_solar(tarih=secilen_tarih, panel_gucu_kw=panel_gucu)
+# --- 4. HAFTALIK VERİ ÇEKİMİ ---
+# Tüm 120 saatlik veriyi tek seferde alıyoruz
+df_haftalik_genel = predict_solar_weekly(panel_gucu_kw=panel_gucu)
+benzersiz_tarihler = df_haftalik_genel['tarih'].unique().tolist()
 
-# 2. ŞİMDİ KİŞİ 2'NİN KODUNU (2. SEÇENEK) BURAYA EKLE:
-try:
-    with st.spinner("Yapay Zeka tavsiyesi hazırlanıyor..."):
-        # Buradaki değişkenleri senin arayüzdeki slider/inputlardan alman lazım
-        tavsiye_metni = generate_advice_for_date(
-            tarih="2026-05-02",   # Arayüzden gelen tarih
-            sicaklik=28.0,        # Arayüzden gelen sıcaklık
-            ruzgar=3.0, 
-            bulutluluk=15.0, 
-            nem=45.0, 
-            panel_gucu_kw=panel_gucu
-        )
-    
-    st.subheader("🤖 KarbonSıfır Asistan Tavsiyesi")
-    st.info(tavsiye_metni)
-
-except Exception as e:
-    st.error("Asistan şu an yoğun, lütfen birazdan tekrar dene.")
-
-# --- 4. VERİ ÜRETİMİ (XGBoost Modeli ile Gerçek Tahmin) ---
-# model/predict.py'den gelen fonksiyonu tek bir kez çağırıyoruz.
-df_gercek = predict_solar(
-    tarih="2026-05-02", 
-    sicaklik=22.0,     # İsteseniz bu değerleri de yan menüden slider ile alabilirsiniz
-    bulutluluk=10.0,   
-    panel_gucu_kw=panel_gucu 
-)
 
 # --- 5. ANA EKRAN VE METRİKLER ---
 st.title("☀️ Akıllı Çatı Güneş Asistanı")
 st.markdown("Günlük enerji üretiminizi takip edin ve tüketiminizi yapay zeka ile optimize edin.")
 st.divider()
 
-st.subheader("📊 Günlük Üretim Özeti")
+col_sel, _, _ = st.columns([1, 2, 1])
+with col_sel:
+    secilen_tarih = st.selectbox("📅 İncelenecek Günü Seçin", benzersiz_tarihler)
+
+# Veriyi seçilen güne göre filtrele (24 saatlik veri)
+secilen_gun_df = df_haftalik_genel[df_haftalik_genel['tarih'] == secilen_tarih].reset_index(drop=True)
+
+st.subheader(f"📊 {secilen_tarih} Tarihi İçin Üretim Özeti")
 col1, col2, col3 = st.columns(3)
 
-# Modelden gelen verilere göre dinamik metrikler hesaplayalım
-gunluk_toplam = df_gercek['beklenen_uretim_kw'].sum()
-zirve_saat = df_gercek.loc[df_gercek['beklenen_uretim_kw'].idxmax(), 'saat']
-zirve_uretim = df_gercek['beklenen_uretim_kw'].max()
+# Seçilen günün metrikleri
+gunluk_toplam = secilen_gun_df['beklenen_uretim_kw'].sum()
+zirve_saat = secilen_gun_df.loc[secilen_gun_df['beklenen_uretim_kw'].idxmax(), 'saat']
+zirve_uretim = secilen_gun_df['beklenen_uretim_kw'].max()
+gunluk_tasarruf = gunluk_toplam * 2.2
+co2_engelleme = gunluk_toplam * 0.4
 
 col1.metric(label="Tahmini Zirve Üretimi", value=f"{zirve_uretim:.1f} kW", delta=f"{zirve_saat}'te Bekleniyor")
 col2.metric(label="Toplam Günlük Üretim", value=f"{gunluk_toplam:.1f} kWh", delta="Güneşli ve Verimli", delta_color="normal")
-col3.metric(label="Tahmini Tasarruf", value="₺75", delta="+₺15 düne göre")
+col3.metric(label="Tahmini Tasarruf", value=f"₺{gunluk_tasarruf:.1f}", delta=f"{co2_engelleme:.1f} kg CO2 engellendi")
 
 # --- 6. PLOTLY İLE SAATLİK GRAFİK ---
-st.subheader("📈 Saatlik Üretim Beklentisi")
+st.subheader(f"📈 {secilen_tarih} Saatlik Üretim Beklentisi")
 
-# df_mock hatasını çözdük, df_gercek kullanıyoruz
-fig = px.area(df_gercek, x='saat', y='beklenen_uretim_kw', 
+fig = px.area(secilen_gun_df, x='saat', y='beklenen_uretim_kw', 
               color_discrete_sequence=['#FFA500'],
               markers=True)
 
-# Grafiğin arka planını transparan yapıp modernleştirelim ve Y eksenini sabitleyelim
 fig.update_layout(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
     xaxis_title="Saat",
     yaxis_title="Üretim (kW)",
     hovermode="x unified",
-    yaxis=dict(range=[0, panel_gucu * 1.2])  # Y eksenini panel gücüne göre dinamik ölçekledik
+    yaxis=dict(range=[0, panel_gucu * 1.2])  
 )
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 7. YAPAY ZEKA ÖNERİ MODÜLÜ (Mock) ---
-st.subheader("🤖 Gemini Akıllı Planlayıcı")
-st.info(f"""
-**💡 Günlük Eylem Planı:**  
-Analizlerime göre enerji üretiminiz bugün saat **{zirve_saat}** civarında zirveye ({zirve_uretim:.1f} kW) ulaşacak. Şebekeden elektrik çekmemek ve %100 temiz enerji kullanmak için:
-*   Çamaşır ve bulaşık makinenizi o saatlerde çalıştırın.
-*   Öğleden sonra bulutlanma beklendiği için yüksek tüketimli cihazları 15:00'ten sonraya bırakmayın.
-""")
+# --- 6.4 HAFTALIK PLANLAMA ---
+st.divider()
+st.subheader("📆 Haftalık Planlama")
+
+gunluk_uretim_plan = df_haftalik_genel.groupby('tarih')['beklenen_uretim_kw'].sum().reset_index()
+
+toplam_5_gun = gunluk_uretim_plan['beklenen_uretim_kw'].sum()
+ortalama_gunluk = gunluk_uretim_plan['beklenen_uretim_kw'].mean()
+toplam_tasarruf_5_gun = toplam_5_gun * 2.2
+
+col_plan1, col_plan2, col_plan3 = st.columns(3)
+with col_plan1:
+    st.metric(label="5 Günlük Toplam", value=f"{toplam_5_gun:.1f} kWh")
+with col_plan2:
+    st.metric(label="Günlük Ortalama", value=f"{ortalama_gunluk:.1f} kWh")
+with col_plan3:
+    st.metric(label="5 Günlük Tahmini Tasarruf", value=f"{toplam_tasarruf_5_gun:.1f} TL", help="2.2 TL/kWh üzerinden hesaplanmıştır")
+
+
+# --- 6.5 HAFTALIK ENERJİ İÇGÖRÜSÜ ---
+st.divider()
+st.subheader("📅 Haftalık Enerji İçgörüsü")
+
+en_iyi_gun_idx = gunluk_uretim_plan['beklenen_uretim_kw'].idxmax()
+en_iyi_gun_tarih = gunluk_uretim_plan.loc[en_iyi_gun_idx, 'tarih']
+en_iyi_gun_uretim = gunluk_uretim_plan.loc[en_iyi_gun_idx, 'beklenen_uretim_kw']
+
+gun_isimleri = {
+    "Monday": "Pazartesi", "Tuesday": "Salı", "Wednesday": "Çarşamba", 
+    "Thursday": "Perşembe", "Friday": "Cuma", "Saturday": "Cumartesi", "Sunday": "Pazar"
+}
+en_iyi_gun_ismi = pd.to_datetime(en_iyi_gun_tarih).strftime("%A")
+en_iyi_gun_ismi_tr = gun_isimleri.get(en_iyi_gun_ismi, en_iyi_gun_ismi)
+
+tasarruf_tl = en_iyi_gun_uretim * 2.2
+karbon_avantaji = en_iyi_gun_uretim * 0.4
+
+col_w1, col_w2, col_w3 = st.columns(3)
+with col_w1:
+    st.info(f"**Haftanın En Verimli Günü:**\n\n### {en_iyi_gun_ismi_tr}")
+with col_w2:
+    st.success(f"**Beklenen Toplam Üretim:**\n\n### {en_iyi_gun_uretim:.1f} kWh")
+with col_w3:
+    st.warning(f"**Karbon Ayak İzi Avantajı:**\n\n### {karbon_avantaji:.1f} kg CO2 engellendi")
+
+st.markdown(f"**💡 Fırsat:** Bu gün ({en_iyi_gun_ismi_tr}) çamaşır/bulaşık yıkarsanız tahmini **{tasarruf_tl:.1f} TL** tasarruf edersiniz.")
+
+try:
+    with st.spinner("🤖 Gemini Haftalık Planınızı Hazırlıyor..."):
+        haftalik_tavsiye = generate_weekly_advice_for_app(en_iyi_gun_ismi_tr, en_iyi_gun_uretim)
+    st.info(f"**🤖 CarbonZero AI Haftalık Tavsiyesi:**\n\n{haftalik_tavsiye}")
+except Exception as e:
+    pass
+
+
+# --- 7. YAPAY ZEKA ÖNERİ MODÜLÜ (Gemini) ---
+st.divider()
+st.subheader(f"🤖 Gemini Akıllı Planlayıcı ({secilen_tarih})")
+
+try:
+    with st.spinner(f"🤖 Gemini {secilen_tarih} günü için tavsiyesini hazırlıyor..."):
+        gunluk_tavsiye = generate_advice_for_dataframe(secilen_gun_df, secilen_tarih)
+    
+    st.info(f"**💡 {secilen_tarih} İçin Günlük Eylem Planı:**\n\n{gunluk_tavsiye}")
+except Exception as e:
+    st.error(f"Gemini bağlantı hatası: {e}")
+
 
 # --- 8. AKILLI BİLDİRİM SİMÜLASYONU ---
-# Set_page_config hatasına neden olan bu bloğu mantıklı bir şekilde en alta taşıdık
 st.divider()
 st.subheader("📲 Akıllı Bildirim Sistemi")
 st.write(f"Ev Sahibi: **{demo_kullanici['ad_soyad']}** ({demo_kullanici['lokasyon']})")
 
 if st.button("📱 Yapay Zeka Önerisini Telefona Gönder"):
-    # Gerçek API yerine 1.5 saniyelik çok şık bir yüklenme efekti koyuyoruz
     with st.spinner("Şebeke üzerinden güvenli SMS iletiliyor..."):
         time.sleep(1.5) 
         
-    # Ekranın sağ altından uçarak çıkan jüri şovu:
     st.toast("SMS Başarıyla İletildi!", icon="🚀")
-    
-    # Ekranda kalıcı başarı mesajı ve gidecek olan metin
-    mesaj = f"CodeXEnergy Asistanı: Sayın {demo_kullanici['ad_soyad']}, güneş paneli üretiminiz {zirve_saat}'te {zirve_uretim:.1f}kW ile zirve yapacak. Çamaşır makinenizi bu saatte çalıştırmanızı öneririm."
+    mesaj = f"CodeXEnergy Asistanı: Sayın {demo_kullanici['ad_soyad']}, {secilen_tarih} tarihinde güneş paneli üretiminiz {zirve_saat}'te {zirve_uretim:.1f}kW ile zirve yapacak. Beyaz eşyalarınızı bu saatlerde çalıştırmanızı öneririm."
     st.success(f"**Bildirim Gönderildi:** Aşağıdaki mesaj {demo_kullanici['telefon']} numaralı telefona başarıyla ulaştı.\n\n> *{mesaj}*")

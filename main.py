@@ -33,10 +33,35 @@ demo_kullanici = {
 
 # --- 3. YAN MENÜ (Sistem Ayarları) ---
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100) # İstersen buraya hackathon logonuzu koy
-st.sidebar.title("⚙️ Sistem Ayarları")
+st.sidebar.title("⚙️ Ayarlar")
 panel_gucu = st.sidebar.slider("Kurulu Panel Gücünüz (kW)", min_value=1.0, max_value=50.0, value=5.0, step=1.0)
 sehir = st.sidebar.selectbox("Pilot Bölge", ["Ankara (Merkez)"])
 elektrik_fiyati = st.sidebar.slider("Elektrik Birim Fiyatı (₺/kWh)", 1.0, 5.0, 2.75)
+
+with st.sidebar.expander("⚙️ Sistem Ayarları", expanded=False):
+    secilen_kur = st.selectbox("Para Birimi", ["₺ (TRY)", "$ (USD)", "€ (EUR)"])
+    grafik_temasi = st.selectbox("Tema", ["Aydınlık Mod (Light)", "Karanlık Mod (Dark)"])
+
+if grafik_temasi == "Karanlık Mod (Dark)":
+    st.markdown("""
+    <style>
+    .stApp { background-color: #0E1117 !important; }
+    [data-testid="stSidebar"] { background-color: #262730 !important; }
+    [data-testid="stHeader"] { background-color: #0E1117 !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 2.5rem !important; }
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"], p, h1, h2, h3, h4, h5, h6, label, span { color: #FAFAFA !important; }
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <style>
+    .stApp { background-color: #FFFFFF !important; }
+    [data-testid="stSidebar"] { background-color: #F0F2F6 !important; }
+    [data-testid="stHeader"] { background-color: #FFFFFF !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 2.5rem !important; }
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"], p, h1, h2, h3, h4, h5, h6, label, span { color: #31333F !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # 1. Önce Kişi 1'in modeliyle veriyi al (Zaten yapmıştın)
 # df_gercek = predict_solar(tarih=secilen_tarih, panel_gucu_kw=panel_gucu)
@@ -81,11 +106,28 @@ col1, col2, col3 = st.columns(3)
 toplam_uretim = df_gercek['beklenen_uretim_kw'].sum()
 zirve_saat = df_gercek.loc[df_gercek['beklenen_uretim_kw'].idxmax(), 'saat']
 zirve_uretim = df_gercek['beklenen_uretim_kw'].max()
-gunluk_tasarruf = toplam_uretim * elektrik_fiyati
+gunluk_tasarruf_tl = toplam_uretim * elektrik_fiyati
+
+if secilen_kur == "$ (USD)":
+    gosterilen_tasarruf = gunluk_tasarruf_tl / 45.19
+    sembol = "$"
+elif secilen_kur == "€ (EUR)":
+    gosterilen_tasarruf = gunluk_tasarruf_tl / 53.20
+    sembol = "€"
+else:
+    gosterilen_tasarruf = gunluk_tasarruf_tl
+    sembol = "₺"
 
 col1.metric(label="Tahmini Zirve Üretimi", value=f"{zirve_uretim:.1f} kW", delta=f"{zirve_saat}'te Bekleniyor")
 col2.metric(label="Toplam Günlük Üretim", value=f"{toplam_uretim:.1f} kWh", delta="Güneşli ve Verimli", delta_color="normal")
-col3.metric(label="Tahmini Tasarruf", value=f"₺{gunluk_tasarruf:.0f}", delta="Faturaya Katkısı")
+col3.metric(label="Tahmini Tasarruf", value=f"{sembol} {gosterilen_tasarruf:.2f}", delta="Faturaya Katkısı")
+
+engellenen_karbon_kg = toplam_uretim * 0.45
+araba_km_esdegeri = engellenen_karbon_kg * 4
+
+st.divider()
+st.subheader("🌍 Çevresel Etki (Karbon Ayak İzi)")
+st.success(f"**Bugünkü Güneş Enerjisi Üretiminizle Doğaya Katkınız:** \n* 💨 **{engellenen_karbon_kg:.1f} kg** CO₂ salınımı engellendi! \n* 🚗 Bu miktar, benzinli bir araçla **{araba_km_esdegeri:.0f} km** yol gitmemeye eşdeğerdir.")
 
 # --- 6. PLOTLY İLE SAATLİK GRAFİK ---
 st.subheader("📈 Saatlik Üretim Beklentisi")
@@ -104,6 +146,12 @@ fig.update_layout(
     hovermode="x unified",
     yaxis=dict(range=[0, panel_gucu * 1.2])  # Y eksenini panel gücüne göre dinamik ölçekledik
 )
+
+if grafik_temasi == "Karanlık Mod (Dark)":
+    fig.update_layout(template="plotly_dark")
+else:
+    fig.update_layout(template="plotly_white")
+
 st.plotly_chart(fig, use_container_width=True)
 
 
@@ -115,4 +163,4 @@ Analizlerime göre enerji üretiminiz bugün saat **{zirve_saat}** civarında zi
 *   Çamaşır ve bulaşık makinenizi o saatlerde çalıştırın.
 *   Öğleden sonra bulutlanma beklendiği için yüksek tüketimli cihazları 15:00'ten sonraya bırakmayın.
 """)
-
+

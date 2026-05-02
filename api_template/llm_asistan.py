@@ -10,10 +10,16 @@ kullanarak kullanicilara akilli oneriler sunar.
 import os
 import sys
 import pandas as pd
-
+from dotenv import load_dotenv
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
+
+try:
+    from google import genai
+    HAS_GENAI = True
+except ImportError:
+    HAS_GENAI = False
 
 # -- Proje kok dizinini sys.path'e ekle (model/ importu icin) ---------------
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -21,6 +27,18 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from model.predict import predict_solar
+
+# -- .env dosyasindan API anahtarini yukle ----------------------------------
+env_path = os.path.join(PROJECT_ROOT, ".env")
+load_dotenv(dotenv_path=env_path)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+GLOBAL_CLIENT = None
+if HAS_GENAI and GEMINI_API_KEY:
+    try:
+        GLOBAL_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as e:
+        print(f"Gemini Client baslatilamadi: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +82,8 @@ class CarbonZeroAssistant:
 
     def __init__(self):
         """Asistani baslat."""
-        pass
+        self.client = GLOBAL_CLIENT
+        self.model_name = "gemini-2.0-flash"
 
     def generate_advice(self, df: pd.DataFrame, secilen_tarih: str = "Bugün", bulutluluk: float = 15.0) -> str:
         """
@@ -115,56 +134,57 @@ class CarbonZeroAssistant:
         )
 
         # -- Gemini API cagrisi (google-genai SDK) ---------------------------
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=f"{sistem_rolu}\n\n{kullanici_promptu}",
-            )
-            return response.text
-        except Exception as e:
-            print(f"API Hatasi (Sistemi durdurmadik): {e}")
+        if self.client:
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=f"{sistem_rolu}\n\n{kullanici_promptu}",
+                )
+                return response.text
+            except Exception as e:
+                print(f"API Hatasi (Sistemi durdurmadik): {e}")
 
         # -- AKILLI YEDEK SISTEM (FALLBACK) --
         if bulutluluk > 50.0:
             # Hava cok kapaliyken
             sahte_cevap = (
-                f"☁️ **Bugun hava kapali, tasarruf moduna gecin!**\n\n"
-                f"Panellerin maksimum **{beklenen_uretim_kw} kW** uretim ile "
+                f"☁️ **Bugün hava kapalı, tasarruf moduna geçin!**\n\n"
+                f"Panellerin maksimum **{beklenen_uretim_kw} kW** üretim ile "
                 f"saat **{saat}**'te zirve yapacak. Ancak bulutlu hava sebebiyle "
-                f"gunluk toplam uretim **{toplam_kwh} kWh**'da kalacak.\n\n"
-                f"**Simdi yapabileceklerin:**\n"
-                f"- ⏳ Agir cihazlari (camasir, kurutma) {secilen_tarih} yerine daha gunesli bir gune ertele\n"
+                f"günlük toplam üretim **{toplam_kwh} kWh**'da kalacak.\n\n"
+                f"**Şimdi yapabileceklerin:**\n"
+                f"- ⏳ Ağır cihazları (çamaşır, kurutma) {secilen_tarih} yerine daha güneşli bir güne ertele\n"
                 f"- 💡 Sadece gerekli elektrikli aletleri kullan"
             )
         elif beklenen_uretim_kw >= 4.0:
             # Hava cok iyi, uretim tavan
             sahte_cevap = (
-                f"☀️ **Harika bir gunes var, tum agir cihazlari calistirabilirsiniz!**\n\n"
-                f"{secilen_tarih} tarihinde Saat **{saat}**'te uretim tam **{beklenen_uretim_kw} kW** ile tavan yapacak!\n"
-                f"Bugun sebekeden cekmeyerek **{co2_kg} kg CO2** tasarrufu sagliyoruz. 🌍💚\n\n"
-                f"**Simdi yapabileceklerin:**\n"
-                f"- 🧺 Camasir ve bulasik makinesini ayni anda calistir\n"
-                f"- 🚗 Elektrikli aracini hizli sarja tak"
+                f"☀️ **Harika bir güneş var, tüm ağır cihazları çalıştırabilirsiniz!**\n\n"
+                f"{secilen_tarih} tarihinde Saat **{saat}**'te üretim tam **{beklenen_uretim_kw} kW** ile tavan yapacak!\n"
+                f"Bugün şebekeden çekmeyerek **{co2_kg} kg CO2** tasarrufu sağlıyoruz. 🌍💚\n\n"
+                f"**Şimdi yapabileceklerin:**\n"
+                f"- 🧺 Çamaşır ve bulaşık makinesini ayni anda çalıştır\n"
+                f"- 🚗 Elektrikli aracını hızlı şarja tak"
             )
-        elif beklenen_uretim_kw >= 2.0:
+        elif beklenen_uretim_kw >= 1.90:
             # Orta seviye uretim
             sahte_cevap = (
-                f"⚡ **Ortalama ve verimli bir gunes gunu!**\n\n"
-                f"{secilen_tarih} tarihi Saat **{saat}** civarinda paneller **{beklenen_uretim_kw} kW** gucunde uretim saglayacak.\n"
-                f"Gunluk **{toplam_kwh} kWh** enerjin var, **{co2_kg} kg CO2** engelleniyor. 📊\n\n"
-                f"**Oneriler:**\n"
-                f"- 🧺 Tek bir agir makineyi (ornegin camasir makinesi) calistir\n"
-                f"- 🏠 Orta tuketimli cihazlarini (supurge vs.) bu saatlerde kullan"
+                f"⚡ **Ortalama ve verimli bir güneş günü!**\n\n"
+                f"{secilen_tarih} tarihi Saat **{saat}** civarında paneller **{beklenen_uretim_kw} kW** gücünde üretim sağlayacak.\n"
+                f"Günlük **{toplam_kwh} kWh** enerjin var, **{co2_kg} kg CO2** engelleniyor. 📊\n\n"
+                f"**Öneriler:**\n"
+                f"- 🧺 Tek bir ağır makineyi (örneğin çamaşır makinesi) çalıştır\n"
+                f"- 🏠 Orta tüketimli cihazlarını (süpürge vs.) bu saatlerde kullan"
             )
         else:
             # Genel dusuk uretim
             sahte_cevap = (
-                f"📉 **Bugun gucumuz biraz sinirli.**\n\n"
-                f"{secilen_tarih} tarihi en iyi saatinde (**{saat}**) bile uretim "
+                f"📉 **Bugün gücümüz biraz sınırlı.**\n\n"
+                f"{secilen_tarih} tarihi en iyi saatinde (**{saat}**) bile üretim "
                 f"**{beklenen_uretim_kw} kW** seviyesinde kalacak.\n\n"
-                f"**Oneriler:**\n"
-                f"- 🔋 Varsa ev bataryalarini idareli kullan\n"
-                f"- 💡 Zorunlu islerini saat {saat}'e planla, digerlerini yarına ertele"
+                f"**Öneriler:**\n"
+                f"- 🔋 Varsa ev bataryalarını idareli kullan\n"
+                f"- 💡 Zorunlu işlerini saat {saat}'e planla, diğerlerini yarına ertele"
             )
 
         return sahte_cevap

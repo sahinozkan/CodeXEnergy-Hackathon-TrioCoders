@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import time
+import io
+import re
+import requests
+from gtts import gTTS
 from model.predict import predict_solar_weekly
 from api_template.llm_asistan import generate_weekly_advice_for_app, generate_advice_for_dataframe
 
@@ -122,9 +126,9 @@ fig.update_layout(
     plot_bgcolor="rgba(0,0,0,0)",
     xaxis_title="Saat",
     yaxis_title="Üretim (kW)",
-    hovermode="x unified",
-    yaxis=dict(range=[0, panel_gucu * 1.2])  
+    hovermode="x unified"
 )
+fig.update_yaxes(range=[0, 4])
 
 if grafik_temasi == "Karanlık Mod (Dark)":
     fig.update_layout(template="plotly_dark")
@@ -197,6 +201,44 @@ try:
         gunluk_tavsiye = generate_advice_for_dataframe(secilen_gun_df, secilen_tarih)
     
     st.info(f"**💡 {secilen_tarih} İçin Günlük Eylem Planı:**\n\n{gunluk_tavsiye}")
+    
+    st.write("🔊 Asistanı Sesli Dinle")
+    # 1. Okunacak tam metni başlık dahil olacak şekilde birleştir
+    tam_metin = f"{secilen_tarih} İçin Günlük Eylem Planı. " + gunluk_tavsiye
+
+    # 2. Yıldızları temizle
+    temiz_metin = tam_metin.replace('*', '')
+
+    # 3. Emojileri ve özel sembolleri Regex ile temizle (Sadece harfler, sayılar, Türkçe karakterler ve temel noktalama işaretleri kalsın)
+    temiz_metin = re.sub(r'[^\w\s.,;:!?()\-üÜğĞıİşŞçÇöÖ]', '', temiz_metin)
+
+    # 4. Temizlenmiş ve emojilerden arındırılmış metni gTTS'e gönder
+    try:
+        tts = gTTS(text=temiz_metin, lang='tr')
+        sound_file = io.BytesIO()
+        tts.write_to_fp(sound_file)
+        st.audio(sound_file)
+    except Exception as tts_err:
+        st.warning("Sesli asistan (Google TTS) sunuculara bağlanamadığı için şu an okuma yapılamıyor.")
+    
+    st.divider()
+    st.write("📱 Akıllı Cihaz Entegrasyonu")
+    if st.button("📲 Eylem Planını Telefonuma Gönder", use_container_width=True):
+        try:
+            # ntfy.sh servisine POST isteği atıyoruz
+            requests.post(
+                "https://ntfy.sh/Trio_Coders",
+                data=temiz_metin.encode('utf-8'),
+                headers={
+                    "Title": "CodeXEnergy Asistani",
+                    "Priority": "high",
+                    "Tags": "robot,zap"
+                }
+            )
+            st.toast("Bildirim başarıyla telefonunuza iletildi!", icon="✅")
+        except Exception as e:
+            st.error(f"Bildirim gönderilemedi. Hata detayı: {e}")
+
 except Exception as e:
     st.error(f"Gemini bağlantı hatası: {e}")
 

@@ -105,20 +105,12 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 
-# --- 8. AKILLI BİLDİRİM SİMÜLASYONU ---
-# Set_page_config hatasına neden olan bu bloğu mantıklı bir şekilde en alta taşıdık
-st.divider()
-st.subheader("📲 Akıllı Bildirim Sistemi")
-st.write(f"Ev Sahibi: **{demo_kullanici['ad_soyad']}** ({demo_kullanici['lokasyon']})")
-
-if st.button("📱 Yapay Zeka Önerisini Telefona Gönder"):
-    # Gerçek API yerine 1.5 saniyelik çok şık bir yüklenme efekti koyuyoruz
-    with st.spinner("Şebeke üzerinden güvenli SMS iletiliyor..."):
-        time.sleep(1.5) 
-        
-    # Ekranın sağ altından uçarak çıkan jüri şovu:
-    st.toast("SMS Başarıyla İletildi!", icon="🚀")
-    
-    # Ekranda kalıcı başarı mesajı ve gidecek olan metin
-    mesaj = f"CodeXEnergy Asistanı: Sayın {demo_kullanici['ad_soyad']}, güneş paneli üretiminiz {zirve_saat}'te {zirve_uretim:.1f}kW ile zirve yapacak. Çamaşır makinenizi bu saatte çalıştırmanızı öneririm."
-    st.success(f"**Bildirim Gönderildi:** Aşağıdaki mesaj {demo_kullanici['telefon']} numaralı telefona başarıyla ulaştı.\n\n> *{mesaj}*")
+# --- 7. YAPAY ZEKA ÖNERİ MODÜLÜ (Mock) ---
+st.subheader("🤖 Gemini Akıllı Planlayıcı")
+st.info(f"""
+**💡 Günlük Eylem Planı:**  
+Analizlerime göre enerji üretiminiz bugün saat **{zirve_saat}** civarında zirveye ({zirve_uretim:.1f} kW) ulaşacak. Şebekeden elektrik çekmemek ve %100 temiz enerji kullanmak için:
+*   Çamaşır ve bulaşık makinenizi o saatlerde çalıştırın.
+*   Öğleden sonra bulutlanma beklendiği için yüksek tüketimli cihazları 15:00'ten sonraya bırakmayın.
+""")
+

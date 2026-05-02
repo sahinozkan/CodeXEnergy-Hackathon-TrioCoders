@@ -37,6 +37,17 @@ st.sidebar.title("⚙️ Sistem Ayarları")
 panel_gucu = st.sidebar.slider("Kurulu Panel Gücünüz (kW)", min_value=1.0, max_value=50.0, value=5.0, step=1.0)
 sehir = st.sidebar.selectbox("Pilot Bölge", ["Ankara (Merkez)"])
 
+if st.sidebar.button("Tahmin Et"):
+    tavsiye = generate_advice_for_date(
+        tarih="2026-05-02",
+        sicaklik=28.0,
+        ruzgar=3.0,
+        bulutluluk=15.0,
+        nem=45.0,
+        panel_gucu_kw=panel_gucu
+    )
+    st.sidebar.markdown(tavsiye)
+
 # 1. Önce Kişi 1'in modeliyle veriyi al (Zaten yapmıştın)
 # df_gercek = predict_solar(tarih=secilen_tarih, panel_gucu_kw=panel_gucu)
 
@@ -57,7 +68,7 @@ try:
     st.info(tavsiye_metni)
 
 except Exception as e:
-    st.error("Asistan şu an yoğun, lütfen birazdan tekrar dene.")
+    st.error(f"🕵️ GERÇEK HATA ŞU: {e}")
 
 # --- 4. VERİ ÜRETİMİ (XGBoost Modeli ile Gerçek Tahmin) ---
 # model/predict.py'den gelen fonksiyonu tek bir kez çağırıyoruz.

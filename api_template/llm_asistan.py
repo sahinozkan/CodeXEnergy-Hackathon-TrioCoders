@@ -10,9 +10,7 @@ kullanarak kullanicilara akilli oneriler sunar.
 import os
 import sys
 import pandas as pd
-from dotenv import load_dotenv
-load_dotenv()
-from google import genai
+
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
@@ -23,21 +21,6 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from model.predict import predict_solar
-
-# -- .env dosyasindan API anahtarini yukle ----------------------------------
-env_path = os.path.join(PROJECT_ROOT, ".env")
-load_dotenv(dotenv_path=env_path)
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError(
-        "GEMINI_API_KEY bulunamadi! "
-        "Lutfen ana dizindeki .env dosyasina GEMINI_API_KEY degerini ekleyin."
-    )
-
-# -- Gemini API istemcisini olustur -----------------------------------------
-client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 # ---------------------------------------------------------------------------
@@ -80,9 +63,8 @@ class CarbonZeroAssistant:
     """
 
     def __init__(self):
-        """Asistani baslat ve Gemini istemcisini yapilandir."""
-        self.client = client
-        self.model_name = "gemini-2.0-flash"
+        """Asistani baslat."""
+        pass
 
     def generate_advice(self, df: pd.DataFrame, bulutluluk: float = 15.0) -> str:
         """
@@ -114,98 +96,50 @@ class CarbonZeroAssistant:
         # Sebekeden cekilmeyen her 1 kWh = 0.4 kg CO2 kurtarir
         co2_kg = round(toplam_kwh * 0.4, 2)
 
-        # -- Sistem rolu ve kullanici promptunu olustur ----------------------
-        sistem_rolu = (
-            "Sen CarbonZero AI adinda cevreci ve akilli bir ev enerjisi "
-            "asistanisin. Yanitlarin motive edici, samimi ve dogrudan eyleme "
-            "yonelik olmali. "
-            "CIKTI FORMAT KURALLARI (KESINLIKLE UYULMALI): "
-            "1) Metni kesinlikle tek parca duz paragraf olarak verme. "
-            "2) Onemli vurgulari (saatler, kW degerleri, CO2 miktari) Markdown "
-            "**kalin (bold)** yap. "
-            "3) Tavsiye edilen eylemleri madde isaretleri (bullet points: - ) "
-            "ile listele. "
-            "4) Uygun yerlerde tatli emojiler kullan (ornek: ☀️🔋🌍💚🏠⚡🚗). "
-            "5) Metin Streamlit arayuzunde gosterilecegi icin gorsel olarak "
-            "cok sik ve taranabilir olmali. "
-            "6) Yanitini maksimum 4-5 satir tut, gereksiz uzatma yapma."
-        )
-
-        kullanici_promptu = (
-            f"Kullanicinin bugun toplam **{toplam_kwh} kWh** gunes enerjisi uretecek. "
-            f"Zirve saati **{saat}**'te **{beklenen_uretim_kw} kW** ile en yuksek uretim olacak. "
-            f"Gunluk hava durumu bulutluluk orani %{bulutluluk}. "
-            f"Gunluk toplam **{co2_kg} kg CO2** salinimi engellenecek. "
-            f"Kullaniciya camasir makinesi, bulasik makinesi veya elektrikli aracini "
-            f"zirve saatinde calistirmasi icin motive edici, cevreci bir bildirim yaz. "
-            f"Ciktini yukaridaki Markdown format kurallarina gore uret."
-        )
-
-        # -- Gemini API cagrisi (google-genai SDK) ---------------------------
-        try:
-            print("\n[TEST] ---> GEMINI API'YE ISTEK GIDIYOR...")
-            
-            # API'ye isteği atıyoruz
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=f"{sistem_rolu}\n\n{kullanici_promptu}",
+        # -- AKILLI YEDEK SISTEM (FALLBACK) --
+        if bulutluluk > 50.0:
+            # Hava cok kapaliyken
+            sahte_cevap = (
+                f"☁️ **Bugun hava kapali, tasarruf moduna gecin!**\n\n"
+                f"Panellerin maksimum **{beklenen_uretim_kw} kW** uretim ile "
+                f"saat **{saat}**'te zirve yapacak. Ancak bulutlu hava sebebiyle "
+                f"gunluk toplam uretim **{toplam_kwh} kWh**'da kalacak.\n\n"
+                f"**Simdi yapabileceklerin:**\n"
+                f"- ⏳ Agir cihazlari (camasir, kurutma) yarin daha gunesli bir gune ertele\n"
+                f"- 💡 Sadece gerekli elektrikli aletleri kullan"
             )
-            
-            print("[TEST] ---> GERÇEK GEMİNİ API BAŞARIYLA ÇALIŞTI ve CEVAP DÖNDÜ! ---")
-            return response.text
-            
-        except Exception as e:
-            print(f"\n[TEST] ---> HATA! GEMINI API COKTU: {e}")
-            print("[TEST] ---> FALLBACK (YEDEK METIN) DEVREYE GIRDI ---")
-            
-            # Eğer API çökerse ekrana basılacak olan senin eski sabit metnin:
-            print(f'[ALERT] API GERCEK HATASI: {e}')
-            return '💡 **Günlük Eylem Planı:** Analizlerime göre bugün güneş enerjisi üretiminiz oldukça verimli görünüyor. Şebekeden elektrik çekmemek ve tasarruf etmek için yüksek tüketimli cihazlarınızı (çamaşır, bulaşık makinesi) öğle saatlerinde çalıştırabilirsiniz.'
+        elif beklenen_uretim_kw >= 4.0:
+            # Hava cok iyi, uretim tavan
+            sahte_cevap = (
+                f"☀️ **Harika bir gunes var, tum agir cihazlari calistirabilirsiniz!**\n\n"
+                f"Saat **{saat}**'te uretim tam **{beklenen_uretim_kw} kW** ile tavan yapacak!\n"
+                f"Bugun sebekeden cekmeyerek **{co2_kg} kg CO2** tasarrufu sagliyoruz. 🌍💚\n\n"
+                f"**Simdi yapabileceklerin:**\n"
+                f"- 🧺 Camasir ve bulasik makinesini ayni anda calistir\n"
+                f"- 🚗 Elektrikli aracini hizli sarja tak"
+            )
+        elif beklenen_uretim_kw >= 2.0:
+            # Orta seviye uretim
+            sahte_cevap = (
+                f"⚡ **Ortalama ve verimli bir gunes gunu!**\n\n"
+                f"Saat **{saat}** civarinda paneller **{beklenen_uretim_kw} kW** gucunde uretim saglayacak.\n"
+                f"Gunluk **{toplam_kwh} kWh** enerjin var, **{co2_kg} kg CO2** engelleniyor. 📊\n\n"
+                f"**Oneriler:**\n"
+                f"- 🧺 Tek bir agir makineyi (ornegin camasir makinesi) calistir\n"
+                f"- 🏠 Orta tuketimli cihazlarini (supurge vs.) bu saatlerde kullan"
+            )
+        else:
+            # Genel dusuk uretim
+            sahte_cevap = (
+                f"📉 **Bugun gucumuz biraz sinirli.**\n\n"
+                f"Gunun en iyi saatinde (**{saat}**) bile uretim "
+                f"**{beklenen_uretim_kw} kW** seviyesinde kalacak.\n\n"
+                f"**Oneriler:**\n"
+                f"- 🔋 Varsa ev bataryalarini idareli kullan\n"
+                f"- 💡 Zorunlu islerini saat {saat}'e planla, digerlerini yarına ertele"
+            )
 
-            # -- API COKERSE CALISACAK AKILLI YEDEK SISTEM (FALLBACK) --
-            if bulutluluk > 50.0:
-                # Hava cok kapaliyken
-                sahte_cevap = (
-                    f"☁️ **Bugun hava kapali, tasarruf moduna gecin!**\n\n"
-                    f"Panellerin maksimum **{beklenen_uretim_kw} kW** uretim ile "
-                    f"saat **{saat}**'te zirve yapacak. Ancak bulutlu hava sebebiyle "
-                    f"gunluk toplam uretim **{toplam_kwh} kWh**'da kalacak.\n\n"
-                    f"**Simdi yapabileceklerin:**\n"
-                    f"- ⏳ Agir cihazlari (camasir, kurutma) yarin daha gunesli bir gune ertele\n"
-                    f"- 💡 Sadece gerekli elektrikli aletleri kullan"
-                )
-            elif beklenen_uretim_kw >= 4.0:
-                # Hava cok iyi, uretim tavan
-                sahte_cevap = (
-                    f"☀️ **Harika bir gunes var, tum agir cihazlari calistirabilirsiniz!**\n\n"
-                    f"Saat **{saat}**'te uretim tam **{beklenen_uretim_kw} kW** ile tavan yapacak!\n"
-                    f"Bugun sebekeden cekmeyerek **{co2_kg} kg CO2** tasarrufu sagliyoruz. 🌍💚\n\n"
-                    f"**Simdi yapabileceklerin:**\n"
-                    f"- 🧺 Camasir ve bulasik makinesini ayni anda calistir\n"
-                    f"- 🚗 Elektrikli aracini hizli sarja tak"
-                )
-            elif beklenen_uretim_kw >= 2.0:
-                # Orta seviye uretim
-                sahte_cevap = (
-                    f"⚡ **Ortalama ve verimli bir gunes gunu!**\n\n"
-                    f"Saat **{saat}** civarinda paneller **{beklenen_uretim_kw} kW** gucunde uretim saglayacak.\n"
-                    f"Gunluk **{toplam_kwh} kWh** enerjin var, **{co2_kg} kg CO2** engelleniyor. 📊\n\n"
-                    f"**Oneriler:**\n"
-                    f"- 🧺 Tek bir agir makineyi (ornegin camasir makinesi) calistir\n"
-                    f"- 🏠 Orta tuketimli cihazlarini (supurge vs.) bu saatlerde kullan"
-                )
-            else:
-                # Genel dusuk uretim
-                sahte_cevap = (
-                    f"📉 **Bugun gucumuz biraz sinirli.**\n\n"
-                    f"Gunun en iyi saatinde (**{saat}**) bile uretim "
-                    f"**{beklenen_uretim_kw} kW** seviyesinde kalacak.\n\n"
-                    f"**Oneriler:**\n"
-                    f"- 🔋 Varsa ev bataryalarini idareli kullan\n"
-                    f"- 💡 Zorunlu islerini saat {saat}'e planla, digerlerini yarına ertele"
-                )
-
-            return sahte_cevap
+        return sahte_cevap
 
 
 # ---------------------------------------------------------------------------

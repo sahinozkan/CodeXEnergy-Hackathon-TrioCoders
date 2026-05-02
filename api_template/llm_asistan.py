@@ -139,15 +139,23 @@ class CarbonZeroAssistant:
 
         # -- Gemini API cagrisi (google-genai SDK) ---------------------------
         try:
+            print("\n[TEST] ---> GEMINI API'YE ISTEK GIDIYOR...")
+            
+            # API'ye isteği atıyoruz
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=f"{sistem_rolu}\n\n{kullanici_promptu}",
             )
-            print("--- GERÇEK GEMİNİ API ÇALIŞTI ---")
+            
+            print("[TEST] ---> GERÇEK GEMİNİ API BAŞARIYLA ÇALIŞTI ve CEVAP DÖNDÜ! ---")
             return response.text
+            
         except Exception as e:
-            print(f"API Hatasi Yakalandi: {e}")
-            print("--- FALLBACK (YEDEK) DEVREYE GİRDİ ---")
+            print(f"\n[TEST] ---> HATA! GEMİNİ API ÇÖKTÜ: {e}")
+            print("[TEST] ---> FALLBACK (YEDEK METİN) DEVREYE GİRDİ ---")
+            
+            # Eğer API çökerse ekrana basılacak olan senin eski sabit metnin:
+            return '💡 **Günlük Eylem Planı:** Analizlerime göre bugün güneş enerjisi üretiminiz oldukça verimli görünüyor. Şebekeden elektrik çekmemek ve tasarruf etmek için yüksek tüketimli cihazlarınızı (çamaşır, bulaşık makinesi) öğle saatlerinde çalıştırabilirsiniz.'
 
             # -- API COKERSE CALISACAK AKILLI YEDEK SISTEM (FALLBACK) --
             if bulutluluk > 50.0:

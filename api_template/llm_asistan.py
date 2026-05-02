@@ -112,17 +112,27 @@ class CarbonZeroAssistant:
         # -- Sistem rolu ve kullanici promptunu olustur ----------------------
         sistem_rolu = (
             "Sen CarbonZero AI adinda cevreci ve akilli bir ev enerjisi "
-            "asistanisin. Yanitlarin cok kisa (maksimum 2-3 cumle), "
-            "motive edici, samimi ve dogrudan eyleme yonelik olmali. "
-            "Ciktida gereksiz uzatmalar yapma."
+            "asistanisin. Yanitlarin motive edici, samimi ve dogrudan eyleme "
+            "yonelik olmali. "
+            "CIKTI FORMAT KURALLARI (KESINLIKLE UYULMALI): "
+            "1) Metni kesinlikle tek parca duz paragraf olarak verme. "
+            "2) Onemli vurgulari (saatler, kW degerleri, CO2 miktari) Markdown "
+            "**kalin (bold)** yap. "
+            "3) Tavsiye edilen eylemleri madde isaretleri (bullet points: - ) "
+            "ile listele. "
+            "4) Uygun yerlerde tatli emojiler kullan (ornek: ☀️🔋🌍💚🏠⚡🚗). "
+            "5) Metin Streamlit arayuzunde gosterilecegi icin gorsel olarak "
+            "cok sik ve taranabilir olmali. "
+            "6) Yanitini maksimum 4-5 satir tut, gereksiz uzatma yapma."
         )
 
         kullanici_promptu = (
-            f"Kullanicinin bugun toplam {toplam_kwh} kWh gunes enerjisi uretecek. "
-            f"Zirve saati {saat}'te {beklenen_uretim_kw} kW ile en yuksek uretim olacak. "
-            f"Gunluk toplam {co2_kg} kg CO2 salinimi engellenecek. "
-            f"Kullaniciya camasir, bulasik makinesi veya elektrikli aracini "
-            f"zirve saatinde calistirmasi icin motive edici, cevreci bir bildirim yaz."
+            f"Kullanicinin bugun toplam **{toplam_kwh} kWh** gunes enerjisi uretecek. "
+            f"Zirve saati **{saat}**'te **{beklenen_uretim_kw} kW** ile en yuksek uretim olacak. "
+            f"Gunluk toplam **{co2_kg} kg CO2** salinimi engellenecek. "
+            f"Kullaniciya camasir makinesi, bulasik makinesi veya elektrikli aracini "
+            f"zirve saatinde calistirmasi icin motive edici, cevreci bir bildirim yaz. "
+            f"Ciktini yukaridaki Markdown format kurallarina gore uret."
         )
 
         # -- Gemini API cagrisi (google-genai SDK) ---------------------------
@@ -138,23 +148,34 @@ class CarbonZeroAssistant:
             # -- API COKERSE CALISACAK AKILLI YEDEK SISTEM (FALLBACK) --
             if beklenen_uretim_kw >= 4.0:
                 sahte_cevap = (
-                    f"Harika haber! Saat {saat}'te panellerin {beklenen_uretim_kw} kW "
-                    f"ile tavan yapacak. Bugun toplam {toplam_kwh} kWh uretim ve "
-                    f"{co2_kg} kg CO2 tasarrufu var. Camasir makinesi veya elektrikli "
-                    f"aracini tam bu saatte calistir!"
+                    f"☀️ **Harika haber!** Saat **{saat}**'te panellerin "
+                    f"**{beklenen_uretim_kw} kW** ile tavan yapacak!\n\n"
+                    f"🌍 Bugun toplam **{toplam_kwh} kWh** uretim ve "
+                    f"**{co2_kg} kg CO2** tasarrufu var.\n\n"
+                    f"**Simdi yapabileceklerin:**\n"
+                    f"- 🧺 Camasir makinesini calistir\n"
+                    f"- 🍽️ Bulasik makinesini calistir\n"
+                    f"- 🚗 Elektrikli aracini sarj et"
                 )
             elif beklenen_uretim_kw >= 2.0:
                 sahte_cevap = (
-                    f"Saat {saat} itibariyle gunesten {beklenen_uretim_kw} kW verimli "
-                    f"enerjimiz var. Bugun toplam {toplam_kwh} kWh uretim ile "
-                    f"{co2_kg} kg CO2 engelliyoruz. Gunluk islerini halletmek icin "
-                    f"guzel bir saat!"
+                    f"⚡ Saat **{saat}** itibariyle gunesten "
+                    f"**{beklenen_uretim_kw} kW** verimli enerjimiz var!\n\n"
+                    f"📊 Bugun toplam **{toplam_kwh} kWh** uretim ile "
+                    f"**{co2_kg} kg CO2** engelliyoruz.\n\n"
+                    f"**Oneriler:**\n"
+                    f"- 🧺 Gunluk camasirlarini bu saatte yika\n"
+                    f"- 🏠 Orta tuketimli cihazlarini calistir"
                 )
             else:
                 sahte_cevap = (
-                    f"Saat {saat}'te uretim sadece {beklenen_uretim_kw} kW seviyesinde. "
-                    f"Gunluk toplam {toplam_kwh} kWh ile sinirli uretim bekleniyor. "
-                    f"Karbon ayak izini dusuk tutmak icin agir cihazlari ertelemeyi dene."
+                    f"☁️ Saat **{saat}**'te uretim sadece "
+                    f"**{beklenen_uretim_kw} kW** seviyesinde.\n\n"
+                    f"📉 Gunluk toplam **{toplam_kwh} kWh** ile sinirli "
+                    f"uretim bekleniyor.\n\n"
+                    f"**Oneriler:**\n"
+                    f"- ⏳ Agir cihazlari daha gunesli saatlere ertele\n"
+                    f"- 💡 Dusuk tuketimli islerini simdi halledebilirsin"
                 )
 
             return sahte_cevap

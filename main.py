@@ -64,23 +64,107 @@ with st.sidebar.expander("🔧 Sistem Ayarları", expanded=False):
 if grafik_temasi == "Karanlık Mod (Dark)":
     st.markdown("""
     <style>
-    .stApp { background-color: #0E1117 !important; }
-    [data-testid="stSidebar"] { background-color: #262730 !important; }
-    [data-testid="stHeader"] { background-color: #0E1117 !important; }
-    [data-testid="stSidebar"] > div:first-child { padding-top: 2.5rem !important; }
-    [data-testid="stMetricValue"], [data-testid="stMetricLabel"], p, h1, h2, h3, h4, h5, h6, label, span { color: #FAFAFA !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body, p, h1, h2, h3, h4, h5, h6, label, button, input, textarea, select, .stMarkdown, .stAlert, [data-testid="stMetricValue"], [data-testid="stMetricLabel"], [data-testid="stWidgetLabel"], .stButton, .stSelectbox, .stSlider, .stExpander { font-family: 'Inter', sans-serif !important; }
+
+    /* ANA ARKA PLAN */
+    .stApp { background: linear-gradient(135deg, #0a0e1a 0%, #0f172a 50%, #0a0e1a 100%) !important; }
+
+    /* SIDEBAR */
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%) !important; border-right: 1px solid rgba(99,102,241,0.25) !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 1.5rem !important; }
+    [data-testid="stSidebar"] label { color: #A5B4FC !important; font-size: 0.82rem !important; font-weight: 600 !important; }
+    [data-testid="stSidebar"] p { color: #CBD5E1 !important; }
+    [data-testid="stSidebar"] .stSlider [data-testid="stTickBarMin"],
+    [data-testid="stSidebar"] .stSlider [data-testid="stTickBarMax"] { color: #94A3B8 !important; }
+
+    /* HEADER */
+    [data-testid="stHeader"] { background: rgba(10,14,26,0.9) !important; border-bottom: 1px solid rgba(99,102,241,0.2) !important; }
+
+    /* BAŞLIK H1 — gradient */
+    h1 { background: linear-gradient(90deg,#F59E0B,#FBBF24,#6366F1) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important; font-size: 2.4rem !important; font-weight: 800 !important; }
+
+    /* ALT BAŞLIKLAR */
+    h2, h3 { color: #E2E8F0 !important; font-weight: 700 !important; }
+    h4, h5, h6 { color: #A5B4FC !important; font-weight: 600 !important; }
+
+    /* GENEL METİN */
+    .stMarkdown p { color: #CBD5E1 !important; }
+    .stMarkdown li { color: #94A3B8 !important; }
+    .stMarkdown strong { color: #FBBF24 !important; }
+    .stMarkdown a { color: #818CF8 !important; }
+    .element-container p { color: #CBD5E1 !important; }
+
+    /* WIDGET ETİKETLERİ (ana alan) */
+    [data-testid="stWidgetLabel"] p { color: #A5B4FC !important; font-weight: 600 !important; }
+    label { color: #A5B4FC !important; }
+
+    /* SELECTBOX */
+    .stSelectbox > div > div { background: rgba(30,27,75,0.8) !important; border: 1px solid rgba(99,102,241,0.4) !important; border-radius: 10px !important; color: #E2E8F0 !important; }
+    .stSelectbox [data-baseweb="select"] span { color: #E2E8F0 !important; }
+
+    /* METRİK KARTLAR */
+    [data-testid="metric-container"] { background: linear-gradient(135deg,rgba(30,27,75,0.8),rgba(15,23,42,0.9)) !important; border: 1px solid rgba(99,102,241,0.35) !important; border-radius: 16px !important; padding: 1.2rem 1.4rem !important; box-shadow: 0 4px 24px rgba(99,102,241,0.15) !important; transition: transform 0.2s ease, box-shadow 0.2s ease !important; }
+    [data-testid="metric-container"]:hover { transform: translateY(-3px) !important; box-shadow: 0 8px 32px rgba(245,158,11,0.25) !important; }
+    [data-testid="stMetricValue"] { color: #F59E0B !important; font-size: 1.9rem !important; font-weight: 800 !important; }
+    [data-testid="stMetricLabel"] { color: #A5B4FC !important; font-size: 0.78rem !important; font-weight: 600 !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; }
+    [data-testid="stMetricDelta"] { color: #34D399 !important; font-size: 0.8rem !important; }
+
+    /* ALERT KUTULAR */
+    .stAlert { border-radius: 14px !important; border-left-width: 5px !important; }
+    [data-testid="stAlertContentInfo"] { background: rgba(99,102,241,0.15) !important; }
+    [data-testid="stAlertContentInfo"] p, [data-testid="stAlertContentInfo"] li { color: #C7D2FE !important; }
+    [data-testid="stAlertContentInfo"] strong { color: #818CF8 !important; }
+    [data-testid="stAlertContentSuccess"] { background: rgba(16,185,129,0.12) !important; }
+    [data-testid="stAlertContentSuccess"] p, [data-testid="stAlertContentSuccess"] li { color: #A7F3D0 !important; }
+    [data-testid="stAlertContentSuccess"] strong { color: #34D399 !important; }
+    [data-testid="stAlertContentWarning"] { background: rgba(245,158,11,0.12) !important; }
+    [data-testid="stAlertContentWarning"] p, [data-testid="stAlertContentWarning"] li { color: #FDE68A !important; }
+    [data-testid="stAlertContentWarning"] strong { color: #FBBF24 !important; }
+
+    /* DIVIDER */
+    hr { border-color: rgba(99,102,241,0.3) !important; }
+
+    /* EXPANDER */
+    [data-testid="stExpander"] { background: rgba(30,27,75,0.5) !important; border: 1px solid rgba(99,102,241,0.3) !important; border-radius: 14px !important; }
+    [data-testid="stExpander"] summary span { color: #E2E8F0 !important; }
+    [data-testid="stExpander"] p { color: #CBD5E1 !important; }
+
+    /* PLOTLY */
+    [data-testid="stPlotlyChart"] { background: rgba(15,23,42,0.6) !important; border: 1px solid rgba(99,102,241,0.2) !important; border-radius: 16px !important; }
+
+    /* YAZILI BÖLÜMLER (slider değer yazısı) */
+    [data-testid="stSlider"] p { color: #F59E0B !important; font-weight: 700 !important; }
+
+    /* CHAT MESAJı */
+    [data-testid="stChatMessage"] { background: rgba(30,27,75,0.6) !important; border: 1px solid rgba(99,102,241,0.2) !important; border-radius: 12px !important; }
     </style>
     """, unsafe_allow_html=True)
 else:
     st.markdown("""
     <style>
-    .stApp { background-color: #FFFFFF !important; }
-    [data-testid="stSidebar"] { background-color: #F0F2F6 !important; }
-    [data-testid="stHeader"] { background-color: #FFFFFF !important; }
-    [data-testid="stSidebar"] > div:first-child { padding-top: 2.5rem !important; }
-    [data-testid="stMetricValue"], [data-testid="stMetricLabel"], p, h1, h2, h3, h4, h5, h6, label, span { color: #31333F !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body, p, h1, h2, h3, h4, h5, h6, label, button, input, textarea, select, .stMarkdown, .stAlert, [data-testid="stMetricValue"], [data-testid="stMetricLabel"], [data-testid="stWidgetLabel"], .stButton, .stSelectbox, .stSlider, .stExpander { font-family: 'Inter', sans-serif !important; }
+    .stApp { background: linear-gradient(135deg,#F8FAFF 0%,#EEF2FF 50%,#FFF7ED 100%) !important; }
+    [data-testid="stSidebar"] { background: linear-gradient(180deg,#FFFFFF 0%,#EEF2FF 100%) !important; border-right: 1px solid rgba(99,102,241,0.15) !important; box-shadow: 2px 0 20px rgba(99,102,241,0.08) !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 1.5rem !important; }
+    [data-testid="stHeader"] { background: rgba(248,250,255,0.9) !important; border-bottom: 1px solid rgba(99,102,241,0.12) !important; }
+    h1 { background: linear-gradient(90deg,#D97706,#F59E0B,#6366F1) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important; font-size: 2.4rem !important; font-weight: 800 !important; }
+    h2, h3 { color: #1E293B !important; font-weight: 700 !important; }
+    h4, h5, h6 { color: #475569 !important; font-weight: 600 !important; }
+    .stMarkdown p, .stMarkdown li { color: #334155 !important; }
+    [data-testid="metric-container"] { background: linear-gradient(135deg,#FFFFFF,#F8FAFF) !important; border: 1px solid rgba(99,102,241,0.2) !important; border-radius: 16px !important; padding: 1.2rem 1.4rem !important; box-shadow: 0 4px 20px rgba(99,102,241,0.1) !important; transition: transform 0.2s ease, box-shadow 0.2s ease !important; }
+    [data-testid="metric-container"]:hover { transform: translateY(-3px) !important; box-shadow: 0 8px 30px rgba(245,158,11,0.2) !important; }
+    [data-testid="stMetricValue"] { color: #D97706 !important; font-size: 1.9rem !important; font-weight: 800 !important; }
+    [data-testid="stMetricLabel"] { color: #64748B !important; font-size: 0.78rem !important; font-weight: 600 !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; }
+    .stAlert { border-radius: 14px !important; border-left-width: 5px !important; }
+    hr { border-color: rgba(99,102,241,0.2) !important; }
+    [data-testid="stExpander"] { background: #FFFFFF !important; border: 1px solid rgba(99,102,241,0.2) !important; border-radius: 14px !important; box-shadow: 0 2px 12px rgba(99,102,241,0.06) !important; }
+    [data-testid="stPlotlyChart"] { background: #FFFFFF !important; border: 1px solid rgba(99,102,241,0.15) !important; border-radius: 16px !important; box-shadow: 0 4px 20px rgba(99,102,241,0.08) !important; }
+    .stSelectbox > div > div { background: #FFFFFF !important; border: 1px solid rgba(99,102,241,0.3) !important; border-radius: 10px !important; }
     </style>
     """, unsafe_allow_html=True)
+
 
 # --- 4. HAFTALIK VERİ ÇEKİMİ ---
 # Tüm 120 saatlik veriyi tek seferde alıyoruz
@@ -255,7 +339,7 @@ with col_w1:
 with col_w2:
     st.success(f"**Beklenen Toplam Üretim:**\n\n### {en_iyi_gun_uretim:.1f} kWh")
 with col_w3:
-    st.warning(f"**Karbon Ayak İzi Avantajı:**\n\n### {karbon_avantaji:.1f} kg CO2 engellendi")
+    st.warning(f"**Karbon Ayak İzi Avantajı:**\n\n### 🌍 {karbon_avantaji:.1f} kg CO₂")
 
 st.markdown(f"**💡 Fırsat:** Bu gün ({en_iyi_gun_ismi_tr}) çamaşır/bulaşık yıkarsanız tahmini **{sembol} {tasarruf_tl:.2f}** tasarruf edersiniz.")
 

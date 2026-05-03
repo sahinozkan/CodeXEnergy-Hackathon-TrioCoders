@@ -66,6 +66,7 @@ def predict_solar(tarih: str, sicaklik: float = 15.0, ruzgar: float = 2.5,
 
     # ── 2. Model ile Tahmin Al (W/m²) ────────────────────────────────────────
     isinim_tahmin = model.predict(girdi)          # güneş ışınımı (W/m²)
+    isinim_tahmin = pd.Series(isinim_tahmin).clip(lower=0).values  # negatif ışınımı sıfırla
 
     # ── 3. Işınımı Enerji Üretimine Dönüştür (kWh) ───────────────────────────
     # Basit yaklaşım: Üretim ∝ ışınım × panel gücü / maksimum ışınım (1000 W/m²)
@@ -76,7 +77,12 @@ def predict_solar(tarih: str, sicaklik: float = 15.0, ruzgar: float = 2.5,
     bulut_cezasi = 1.0 - (canli_bulutluluk / 100.0) * 0.75
     uretim_kw = uretim_kw * bulut_cezasi
 
-    uretim_kw = pd.Series(uretim_kw).clip(lower=0)            # negatif tahminleri sıfırla
+    uretim_kw = pd.Series(uretim_kw).clip(lower=0)            # negatif üretimi sıfırla
+
+    # Gece saatlerinde (SZA=90, güneş ufkun altında) üretimi sıfırla
+    gece_saatler = list(range(0, 6)) + list(range(19, 24))  # 00-05 ve 19-23
+    uretim_kw = uretim_kw.copy()
+    uretim_kw.iloc[gece_saatler] = 0.0
 
     # ── 4. Sonuç DataFrame ───────────────────────────────────────────────────
     saatler = [f"{str(i).zfill(2)}:00" for i in range(24)]
@@ -143,14 +149,18 @@ def predict_solar_weekly(panel_gucu_kw: float = 5.0):
     })
     
     isinim_tahmin = model.predict(girdi)
+    isinim_tahmin = pd.Series(isinim_tahmin).clip(lower=0).values  # negatif ışınımı sıfırla
     
     uretim_kw = (isinim_tahmin / 1000.0) * panel_gucu_kw
     
     # Bulutluluk cezası (Matematiksel simülasyon)
     bulut_cezasi = 1.0 - (pd.Series(bulutluluk_oranlari) / 100.0) * 0.75
-    uretim_kw = uretim_kw * bulut_cezasi
+    uretim_kw = pd.Series(uretim_kw * bulut_cezasi).clip(lower=0)
     
-    uretim_kw = pd.Series(uretim_kw).clip(lower=0)
+    # Gece saatlerinde (SZA=90, güneş ufkun altında) üretimi sıfırla
+    gece_mask = pd.Series(saatler).isin(list(range(0, 6)) + list(range(19, 24)))
+    uretim_kw = uretim_kw.copy()
+    uretim_kw[gece_mask.values] = 0.0
     
     sonuc = pd.DataFrame({
         "tarih"             : tarihler,

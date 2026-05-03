@@ -52,12 +52,12 @@ if os.path.exists("triocoders_logo.png") and os.path.getsize("triocoders_logo.pn
     st.sidebar.image("triocoders_logo.png", use_container_width=True)
 else:
     st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100) # Fallback
-st.sidebar.title("⚙️ Ayarlar")
-panel_gucu = st.sidebar.slider("Kurulu Panel Gücünüz (kW)", min_value=1.0, max_value=50.0, value=5.0, step=1.0)
-sehir = st.sidebar.selectbox("Pilot Bölge", ["Ankara (Merkez)"])
-elektrik_fiyati = st.sidebar.slider("Elektrik Birim Fiyatı (₺/kWh)", 1.0, 5.0, 2.75)
+st.sidebar.divider()
+panel_gucu = st.sidebar.slider("⚡ Kurulu Panel Gücünüz (kW)", min_value=1.0, max_value=50.0, value=5.0, step=1.0)
+sehir = st.sidebar.selectbox("📍 Pilot Bölge", ["Ankara (Merkez)"])
+elektrik_fiyati = st.sidebar.slider("💰 Elektrik Birim Fiyatı (₺/kWh)", 1.0, 5.0, 2.75)
 
-with st.sidebar.expander("⚙️ Sistem Ayarları", expanded=False):
+with st.sidebar.expander("🔧 Sistem Ayarları", expanded=False):
     secilen_kur = st.selectbox("Para Birimi", ["₺ (TRY)", "$ (USD)", "€ (EUR)"])
     grafik_temasi = st.selectbox("Tema", ["Aydınlık Mod (Light)", "Karanlık Mod (Dark)"])
 
@@ -88,7 +88,7 @@ df_haftalik_genel = predict_solar_weekly(panel_gucu_kw=panel_gucu)
 benzersiz_tarihler = df_haftalik_genel['tarih'].unique().tolist()
 
 # --- 5. ANA EKRAN VE METRİKLER ---
-st.title("☀️ Akıllı Çatı Güneş Asistanı")
+st.title("☀️ Akıllı Güneş Paneli Sistemi")
 st.markdown("Günlük enerji üretiminizi takip edin ve tüketiminizi yapay zeka ile optimize edin.")
 st.divider()
 
@@ -98,6 +98,8 @@ with col_sel:
 
 # Veriyi seçilen güne göre filtrele (24 saatlik veri)
 secilen_gun_df = df_haftalik_genel[df_haftalik_genel['tarih'] == secilen_tarih].reset_index(drop=True)
+
+gemini_container = st.container()
 
 st.subheader(f"📊 {secilen_tarih} Tarihi İçin Üretim Özeti")
 tracker_aktif = st.toggle("🔄 Akıllı Güneş Takip (Solar Tracker) Simülasyonunu Aç")
@@ -119,9 +121,9 @@ else:
     gosterilen_tasarruf = gunluk_tasarruf_tl
     sembol = "₺"
 
-col1.metric(label="Tahmini Zirve Üretimi", value=f"{zirve_uretim:.1f} kW", delta=f"{zirve_saat}'te Bekleniyor")
-col2.metric(label="Toplam Günlük Üretim", value=f"{gunluk_toplam:.1f} kWh", delta="Güneşli ve Verimli", delta_color="normal")
-col3.metric(label="Tahmini Tasarruf", value=f"{sembol} {gosterilen_tasarruf:.2f}", delta="Faturaya Katkısı")
+col1.metric(label="⚡ Zirve Üretim", value=f"{zirve_uretim:.1f} kW", delta=f"{zirve_saat}'te Bekleniyor")
+col2.metric(label="☀️ Günlük Toplam", value=f"{gunluk_toplam:.1f} kWh", delta="Güneşli ve Verimli", delta_color="normal")
+col3.metric(label="💰 Fatura Tasarrufu", value=f"{sembol} {gosterilen_tasarruf:.2f}", delta="Faturaya Katkısı")
 
 if tracker_aktif:
     sabit_uretim = gunluk_toplam
@@ -139,43 +141,12 @@ if tracker_aktif:
         
     st.markdown("##### 🔄 Hareketli Panel (Solar Tracker) Farkı")
     tcol1, tcol2, tcol3 = st.columns(3)
-    tcol1.metric("⚡ Ekstra Üretim", f"+ {ekstra_kwh:.1f} kWh")
-    tcol2.metric("🌍 Ekstra Karbon Kurtarımı", f"+ {ekstra_co2:.1f} kg")
-    tcol3.metric("💰 Günlük Ekstra Kazanç", f"+ {sembol} {ekstra_gelir:.2f}")
-
-engellenen_karbon_kg = gunluk_toplam * 0.45
-kurtarilan_agac = int(engellenen_karbon_kg / 0.06)
-
-st.divider()
-st.subheader("🌍 Çevresel Etki (Karbon Ayak İzi)")
-st.success(f"**Bugünkü Güneş Enerjisi Üretiminizle Doğaya Katkınız:** \n* 💨 **{engellenen_karbon_kg:.1f} kg** CO₂ salınımı engellendi! \n* 🌳 Bu miktar, tam {kurtarilan_agac} yetişkin ağacın bir tam günde temizleyebileceği havaya eşdeğerdir!")
-
-st.write("") # Boşluk bırak
-with st.expander("⚡ Şebekeye Satış (Mahsuplaşma) Simülatörü", expanded=True):
-    st.markdown("Türkiye 'Lisanssız Elektrik Üretimi' yönetmeliğine göre ihtiyaç fazlası enerjinizi şebekeye satabilirsiniz. (EPDK verilerine göre Türkiye'de günlük ortalama ev tüketimi **8.0 kWh**'dir.)")
-    
-    # Kullanıcıdan tahmini günlük tüketimini al
-    gunluk_tuketim = st.slider("Bugünkü Tahmini Ev Tüketiminiz (kWh)", min_value=0.0, max_value=50.0, value=8.0, step=0.5)
-    
-    # Hesaplama:
-    net_enerji = gunluk_toplam - gunluk_tuketim 
-    
-    if net_enerji > 0:
-        satis_geliri = net_enerji * elektrik_fiyati 
-        
-        if 'secilen_kur' in locals() and secilen_kur == "$ (USD)":
-            gosterilen_gelir = f"$ {(satis_geliri / 45.19):.2f}"
-        elif 'secilen_kur' in locals() and secilen_kur == "€ (EUR)":
-            gosterilen_gelir = f"€ {(satis_geliri / 53.20):.2f}"
-        else:
-            gosterilen_gelir = f"₺ {satis_geliri:.2f}"
-            
-        st.success(f"**Tebrikler!** Tüketiminizden arta kalan **{net_enerji:.1f} kWh** enerjiyi şebekeye sattınız. **Net Kazanç: {gosterilen_gelir}**")
-    else:
-        st.warning(f"Bugün üretiminiz tüketiminizi karşılamıyor. Şebekeden **{abs(net_enerji):.1f} kWh** enerji çekeceksiniz.")
+    tcol1.metric("⚡ Tracker Kazancı", f"+ {ekstra_kwh:.1f} kWh")
+    tcol2.metric("🌍 CO₂ Tasarrufu", f"+ {ekstra_co2:.1f} kg")
+    tcol3.metric("💵 Ekstra Gelir", f"+ {sembol} {ekstra_gelir:.2f}")
 
 # --- 6. PLOTLY İLE SAATLİK GRAFİK ---
-st.subheader(f"📈 {secilen_tarih} Saatlik Üretim Beklentisi")
+st.subheader("📈 Saatlik Üretim Tahmini")
 
 fig = px.area(secilen_gun_df, x='saat', y='beklenen_uretim_kw', 
               color_discrete_sequence=['#FFA500'],
@@ -210,9 +181,40 @@ if tracker_aktif:
 
 st.plotly_chart(fig, use_container_width=True)
 
+engellenen_karbon_kg = gunluk_toplam * 0.45
+kurtarilan_agac = int(engellenen_karbon_kg / 0.06)
+
+st.divider()
+st.subheader("🌍 Çevresel Etki (Karbon Ayak İzi)")
+st.success(f"**Bugünkü Güneş Enerjisi Üretiminizle Doğaya Katkınız:** \n* 💨 **{engellenen_karbon_kg:.1f} kg** CO₂ salınımı engellendi! \n* 🌳 Bu miktar, tam {kurtarilan_agac} yetişkin ağacın bir tam günde temizleyebileceği havaya eşdeğerdir!")
+
+st.write("") # Boşluk bırak
+with st.expander("⚡ Şebekeye Satış (Mahsuplaşma) Simülatörü", expanded=True):
+    st.markdown("Türkiye 'Lisanssız Elektrik Üretimi' yönetmeliğine göre ihtiyaç fazlası enerjinizi şebekeye satabilirsiniz. (EPDK verilerine göre Türkiye'de günlük ortalama ev tüketimi **8.0 kWh**'dir.)")
+    
+    # Kullanıcıdan tahmini günlük tüketimini al
+    gunluk_tuketim = st.slider("Bugünkü Tahmini Ev Tüketiminiz (kWh)", min_value=0.0, max_value=50.0, value=8.0, step=0.5)
+    
+    # Hesaplama:
+    net_enerji = gunluk_toplam - gunluk_tuketim 
+    
+    if net_enerji > 0:
+        satis_geliri = net_enerji * elektrik_fiyati 
+        
+        if 'secilen_kur' in locals() and secilen_kur == "$ (USD)":
+            gosterilen_gelir = f"$ {(satis_geliri / 45.19):.2f}"
+        elif 'secilen_kur' in locals() and secilen_kur == "€ (EUR)":
+            gosterilen_gelir = f"€ {(satis_geliri / 53.20):.2f}"
+        else:
+            gosterilen_gelir = f"₺ {satis_geliri:.2f}"
+            
+        st.success(f"**Tebrikler!** Tüketiminizden arta kalan **{net_enerji:.1f} kWh** enerjiyi şebekeye sattınız. **Net Kazanç: {gosterilen_gelir}**")
+    else:
+        st.warning(f"Bugün üretiminiz tüketiminizi karşılamıyor. Şebekeden **{abs(net_enerji):.1f} kWh** enerji çekeceksiniz.")
+
 # --- 6.4 HAFTALIK PLANLAMA ---
 st.divider()
-st.subheader("📆 Haftalık Planlama")
+st.subheader("📅 Haftalık Enerji Planı")
 
 gunluk_uretim_plan = df_haftalik_genel.groupby('tarih')['beklenen_uretim_kw'].sum().reset_index()
 
@@ -266,70 +268,71 @@ except Exception as e:
 
 
 # --- 7. YAPAY ZEKA ÖNERİ MODÜLÜ (Gemini) ---
-st.divider()
-st.subheader(f"🤖 Gemini Akıllı Planlayıcı ({secilen_tarih})")
+with gemini_container:
+    st.divider()
+    st.subheader(f"🤖 AI Enerji Danışmanı ({secilen_tarih})")
 
-try:
-    with st.spinner(f"🤖 Gemini {secilen_tarih} günü için tavsiyesini hazırlıyor..."):
-        gunluk_tavsiye = generate_advice_for_dataframe(secilen_gun_df, secilen_tarih)
-    
-    # Ekranda (st.info) görünmesi için ek analitik kuralı doğrudan ana metne dahil ediyoruz
-    gunluk_tavsiye += f"\n\n📌 **Öneri:** Haftanın en verimli günü **{en_iyi_gun_ismi_tr}**. Eğer aciliyetin yoksa yüksek enerji gerektiren planlarını o güne bırakabilirsin."
+    try:
+        with st.spinner(f"🤖 Gemini {secilen_tarih} günü için tavsiyesini hazırlıyor..."):
+            gunluk_tavsiye = generate_advice_for_dataframe(secilen_gun_df, secilen_tarih)
+        
+        # Ekranda (st.info) görünmesi için ek analitik kuralı doğrudan ana metne dahil ediyoruz
+        gunluk_tavsiye += f"\n\n📌 **Öneri:** Haftanın en verimli günü **{en_iyi_gun_ismi_tr}**. Eğer aciliyetin yoksa yüksek enerji gerektiren planlarını o güne bırakabilirsin."
 
-    if tracker_aktif:
-        gunluk_tavsiye += f"\n\n💡 Yatırım Tavsiyesi: Eğer çatıdaki sisteminizi 'Hareketli Panel (Solar Tracker)' sistemine geçirirseniz, sadece bugün ekstra {ekstra_kwh:.1f} kWh enerji ve {sembol} {ekstra_gelir:.2f} kazanç elde ederdiniz. Bu sistem kendini kısa sürede amorti edebilir!"
+        if tracker_aktif:
+            gunluk_tavsiye += f"\n\n💡 Yatırım Tavsiyesi: Eğer çatıdaki sisteminizi 'Hareketli Panel (Solar Tracker)' sistemine geçirirseniz, sadece bugün ekstra {ekstra_kwh:.1f} kWh enerji ve {sembol} {ekstra_gelir:.2f} kazanç elde ederdiniz. Bu sistem kendini kısa sürede amorti edebilir!"
 
-    st.info(f"**💡 {secilen_tarih} İçin Günlük Eylem Planı:**\n\n{gunluk_tavsiye}")
-    
-    st.write("🔊 Asistanı Sesli Dinle")
-    # 1. Okunacak tam metni başlık dahil olacak şekilde birleştir
-    tam_metin = f"{secilen_tarih} İçin Günlük Eylem Planı. " + gunluk_tavsiye
+        st.write("🔊 Asistanı Sesli Dinle")
+        # 1. Okunacak tam metni başlık dahil olacak şekilde birleştir
+        tam_metin = f"{secilen_tarih} İçin Günlük Eylem Planı. " + gunluk_tavsiye
 
-    # 2. Yıldızları temizle
-    temiz_metin = tam_metin.replace('*', '')
+        # 2. Yıldızları temizle
+        temiz_metin = tam_metin.replace('*', '')
 
-    # 3. Emojileri ve özel sembolleri Regex ile temizle (Sadece harfler, sayılar, Türkçe karakterler ve temel noktalama işaretleri kalsın)
-    temiz_metin = re.sub(r'[^\w\s.,;:!?()\-üÜğĞıİşŞçÇöÖ]', '', temiz_metin)
-
-
-    if "ilk_bildirim_gonderildi" not in st.session_state:
-        try:
-            import requests
-            requests.post(
-                "https://ntfy.sh/Trio_Coders",
-                data=temiz_metin.encode('utf-8'),
-                headers={
-                    "Title": "CodeXEnergy Asistani", 
-                    "Priority": "high", 
-                    "Tags": "robot,zap",
-                    "Actions": "view, Panele Don ve Uygula, http://localhost:8501" 
-                }
-            )
-            st.session_state.ilk_bildirim_gonderildi = True
-        except Exception as e:
-            pass # Otomatik akışta arayüze hata basıp UX'i bozma
-
-    # 4. Temizlenmiş ve emojilerden arındırılmış metni gTTS'e gönder
-    if HAS_GTTS:
-        try:
-            tts = gTTS(text=temiz_metin, lang='tr')
-            sound_file = io.BytesIO()
-            tts.write_to_fp(sound_file)
-            st.audio(sound_file)
-        except Exception as tts_err:
-            st.warning("Sesli asistan (Google TTS) sunuculara bağlanamadığı için şu an okuma yapılamıyor.")
-    else:
-        st.warning("Sesli okuma için 'gTTS' kütüphanesi eksik. Terminale yazın: pip install gTTS")
-    
+        # 3. Emojileri ve özel sembolleri Regex ile temizle (Sadece harfler, sayılar, Türkçe karakterler ve temel noktalama işaretleri kalsın)
+        temiz_metin = re.sub(r'[^\w\s.,;:!?()\-üÜğĞıİşŞçÇöÖ]', '', temiz_metin)
 
 
-except Exception as e:
-    st.error(f"Gemini bağlantı hatası: {e}")
+        if "ilk_bildirim_gonderildi" not in st.session_state:
+            try:
+                import requests
+                requests.post(
+                    "https://ntfy.sh/Trio_Coders",
+                    data=temiz_metin.encode('utf-8'),
+                    headers={
+                        "Title": "CodeXEnergy Asistani", 
+                        "Priority": "high", 
+                        "Tags": "robot,zap",
+                        "Actions": "view, Panele Don ve Uygula, http://localhost:8501" 
+                    }
+                )
+                st.session_state.ilk_bildirim_gonderildi = True
+            except Exception as e:
+                pass # Otomatik akışta arayüze hata basıp UX'i bozma
+
+        # 4. Temizlenmiş ve emojilerden arındırılmış metni gTTS'e gönder
+        if HAS_GTTS:
+            try:
+                tts = gTTS(text=temiz_metin, lang='tr')
+                sound_file = io.BytesIO()
+                tts.write_to_fp(sound_file)
+                st.audio(sound_file)
+            except Exception as tts_err:
+                st.warning("Sesli asistan (Google TTS) sunuculara bağlanamadığı için şu an okuma yapılamıyor.")
+        else:
+            st.warning("Sesli okuma için 'gTTS' kütüphanesi eksik. Terminale yazın: pip install gTTS")
+            
+        st.info(f"**💡 {secilen_tarih} İçin Günlük Eylem Planı:**\n\n{gunluk_tavsiye}")
+        
+
+
+    except Exception as e:
+        st.error(f"Gemini bağlantı hatası: {e}")
 
 
 # --- 8. YARDIM MASASI (Kural Tabanlı Asistan) ---
 st.divider()
-st.subheader("💬 CodeXEnergy Yardım Masası")
+st.subheader("💬 Sık Sorulan Sorular")
 
 sss_sozlugu = {
     "Lütfen sormak istediğiniz soruyu seçin...": "",

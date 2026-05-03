@@ -416,7 +416,7 @@ with gemini_container:
 
 # --- 8. YARDIM MASASI (Kural Tabanlı Asistan) ---
 st.divider()
-st.subheader("💬 Sık Sorulan Sorular")
+st.subheader("💬 Yardımcı Asistan")
 
 sss_sozlugu = {
     "Lütfen sormak istediğiniz soruyu seçin...": "",

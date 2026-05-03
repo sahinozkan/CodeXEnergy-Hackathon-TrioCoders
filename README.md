@@ -53,3 +53,7 @@ streamlit run app.py
 Geliştirici Ekip: TrioCoders
 
 CodeXEnergy Hackathon Finalist Projesidir.
+
+
+
+https://drive.google.com/drive/folders/15N5pw04tqS0XdHvqxhEwAwPjW69gXbyE?usp=sharing
